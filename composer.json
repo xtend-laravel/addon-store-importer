@@ -1,0 +1,37 @@
+{
+    "name": "xtend-laravel/addon-store-importer",
+    "description": "Store Importer for XtendLunar",
+    "type": "library",
+    "keywords": [
+        "laravel",
+        "lunar",
+        "prestashop",
+        "xtendlunar",
+        "importer"
+    ],
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "XtendLunar\\Addons\\StoreImporter\\": "src/",
+            "StoreImporter\\Database\\Factories\\": "database/factories/",
+            "StoreImporter\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Adam Lee",
+            "email": "adam@codelabx.ltd"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [
+                "XtendLunar\\Addons\\StoreImporter\\StoreImporterProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "require": {
+        "spatie/simple-excel": "dev-main"
+    }
+}
