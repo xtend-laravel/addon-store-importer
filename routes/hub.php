@@ -12,5 +12,5 @@ Route::group([
     'middleware' => ['web', Authenticate::class, 'can:settings:core'],
 ], function () {
     Route::get('/store-importer', StoreImporter::class)->name('hub.store-importer');
-    Route::get('/store-importer/{importer}', StoreImporter::class)->name('hub.store-importer.show');
+    //Route::get('/store-importer/{importer}', StoreImporter::class)->name('hub.store-importer.show');
 });

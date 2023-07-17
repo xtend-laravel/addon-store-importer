@@ -1,9 +1,9 @@
 <?php
 
-use App\Enums\FileType;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use XtendLunar\Addons\StoreImporter\Enums\FileType;
 
 return new class extends Migration
 {
@@ -15,10 +15,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('xtend_store_importer_files', function (Blueprint $table) {
-            $table->uuid();
+            $table->uuid('id')->primary();
 			$table->string('name');
-            $table->string('path');
-            $table->enum('type', FileType::getValues())->default(FileType::CSV);
+            $table->string('key');
+            $table->enum('type', FileType::getValues())->default(FileType::CSV->value);
+            $table->json('headers')->nullable();
 			$table->json('settings')->nullable();
             $table->timestamps();
         });

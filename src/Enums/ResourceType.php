@@ -17,6 +17,6 @@ enum ResourceType: string
 
     public static function getValues(): array
     {
-        return array_values(self::cases());
+        return array_column(self::cases(), 'value');
     }
 }

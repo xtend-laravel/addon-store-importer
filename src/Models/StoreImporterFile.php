@@ -21,10 +21,11 @@ class StoreImporterFile extends Model
 
 	protected $casts = [
         'type' => FileType::class,
+        'headers' => 'array',
         'settings' => 'array',
 	];
 
-	protected $table = 'xtend_store_importer';
+	protected $table = 'xtend_store_importer_files';
 
 	public function resources(): HasMany
     {

@@ -1,9 +1,9 @@
 <?php
 
-use App\Enums\ResourceModelStatus;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use XtendLunar\Addons\StoreImporter\Enums\ResourceModelStatus;
 
 return new class extends Migration
 {
@@ -22,8 +22,7 @@ return new class extends Migration
                 ->cascadeOnDelete();
 
 			$table->morphs('model');
-	        $table->enum('status', ResourceModelStatus::getValues())
-                ->default(ResourceModelStatus::Pending);
+	        $table->enum('status', ResourceModelStatus::getValues())->default(ResourceModelStatus::Pending->value);
             $table->timestamp('succeeded_at')->nullable();
 			$table->timestamp('failed_at')->nullable();
 			$table->string('failed_reason')->nullable();
