@@ -4,6 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use XtendLunar\Addons\StoreImporter\Enums\ResourceGroup;
+use XtendLunar\Addons\StoreImporter\Enums\ResourceType;
 
 return new class extends Migration
 {
@@ -21,8 +22,8 @@ return new class extends Migration
                 ->cascadeOnUpdate()
                 ->cascadeOnDelete();
 
-			$table->string('name');
-            $table->enum('type', ResourceGroup::getValues())->default(ResourceGroup::Core->value);
+            $table->enum('group', ResourceGroup::getValues())->default(ResourceGroup::Core->value);
+            $table->enum('type', ResourceType::getValues())->nullable();
 			$table->json('field_map')->nullable();
             $table->timestamps();
         });

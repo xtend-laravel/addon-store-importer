@@ -36,9 +36,11 @@ class StoreImporterProvider extends XtendAddonProvider
 	    ]);
 
         $this->app->bind(FileImportInterface::class, function ($app, array $args) {
-            /** @var File | TemporaryUploadedFile | UploadedFile $file */
+
             $file = $args['file'];
-            return match ($file->extension()) {
+            $extension = is_string($file) ? pathinfo($file, PATHINFO_EXTENSION) : $file->extension();
+
+            return match ($extension) {
                 FileType::CSV->value => new CsvImport($file),
                 FileType::JSON->value => new JsonImport($file),
                 default => throw new \Exception('Invalid file type.'),

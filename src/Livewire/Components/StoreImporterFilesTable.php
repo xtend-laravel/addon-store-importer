@@ -7,9 +7,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Livewire\Component;
 use Lunar\Hub\Http\Livewire\Traits\Notifies;
 use XtendLunar\Addons\StoreImporter\Models\StoreImporterFile;
+use XtendLunar\Features\FormBuilder\Livewire\Concerns\HasForms;
 
 class StoreImporterFilesTable extends Component implements Tables\Contracts\HasTable
 {
+    use HasForms;
     use Notifies;
     use Tables\Concerns\InteractsWithTable;
 
@@ -40,10 +42,21 @@ class StoreImporterFilesTable extends Component implements Tables\Contracts\HasT
     protected function getTableActions(): array
     {
         return [
-             Tables\Actions\ActionGroup::make([
-                 Tables\Actions\ViewAction::make(),
-             ]),
+            Tables\Actions\EditAction::make(),
         ];
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function mountTableAction(string $name, ?string $record = null): void
+    {
+        $model = StoreImporterFile::findOrFail($record);
+        $this->triggerForm(
+            handle: 'store-importer-file-form',
+            model: $model,
+            uiComponent: 'slideover',
+        );
     }
 
     /**

@@ -17,7 +17,13 @@ class StoreImporterFile extends Model
 {
     use HasFactory, HasUuids;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'key',
+        'type',
+        'headers',
+        'settings',
+    ];
 
 	protected $casts = [
         'type' => FileType::class,
