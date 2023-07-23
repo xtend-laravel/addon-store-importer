@@ -151,7 +151,6 @@ class ProductSync implements ShouldQueue
             $primaryColor = $color->first()['hex'] ?? null;
             $secondaryColor = $color->get(1)['hex'] ?? null;
             $tertiaryColor = $color->get(2)['hex'] ?? null;
-            $quaternaryColor = $color->get(3)['hex'] ?? null;
 
             $name = $color->pluck('name')->implode(' ');
 
@@ -163,7 +162,6 @@ class ProductSync implements ShouldQueue
                 'primary_color' => $primaryColor ?? null,
                 'secondary_color' => $secondaryColor ?? null,
                 'tertiary_color' => $tertiaryColor ?? null,
-                'quaternary_color' => $quaternaryColor ?? null,
             ];
         }
 
