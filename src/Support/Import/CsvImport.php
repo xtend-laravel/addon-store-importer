@@ -4,7 +4,9 @@ namespace XtendLunar\Addons\StoreImporter\Support\Import;
 
 use Illuminate\Http\File;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\LazyCollection;
 use Illuminate\Support\Str;
 use Spatie\SimpleExcel\SimpleExcelReader;
 
@@ -47,6 +49,11 @@ class CsvImport implements FileImportInterface
     {
         return collect($this->reader->getHeaders() ?? [])
             ->flatMap(fn ($header) => [Str::slug($header, '_') => $header])->toArray();
+    }
+
+    public function getRows(): Collection
+    {
+        return $this->reader->getRows()->collect();
     }
 
     public function close(): void

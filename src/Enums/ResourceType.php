@@ -5,15 +5,14 @@ namespace XtendLunar\Addons\StoreImporter\Enums;
 enum ResourceType: string
 {
     case Products = 'products';
-    case Categories = 'categories';
+    case Variants = 'variants';
+    case Prices = 'prices';
+    case Collections = 'collections';
     case Brands = 'brands';
-    case ProductOptions = 'product_options';
-    case ProductFeatures = 'product_features';
-    case Orders = 'orders';
-    case Carts = 'carts';
-    case Customers = 'customers';
-    case Addresses = 'addresses';
-    case Pages = 'pages';
+    // case Orders = 'orders';
+    // case Carts = 'carts';
+    // case Customers = 'customers';
+    // case Addresses = 'addresses';
 
     public static function getValues(): array
     {

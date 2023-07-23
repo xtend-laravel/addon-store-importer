@@ -8,25 +8,23 @@ use Lunar\FieldTypes\ListField;
 use Lunar\FieldTypes\Text;
 use Lunar\FieldTypes\TranslatedText;
 use Lunar\Models\Attribute;
-use Lunar\Models\Product;
+use Lunar\Models\Product as ProductModel;
 use Lunar\Models\ProductType;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Processor;
 use XtendLunar\Addons\StoreImporter\Models\StoreImporterResourceModel;
 
-class ProductSave extends Processor
+class Product extends Processor
 {
     public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
     {
-        $productModel = Product::updateOrCreate([
-            'legacy_data->id_product' => $product->get('legacy')->get('id_product'),
+        $productModel = ProductModel::updateOrCreate([
+            'sku' => $product->get('sku'),
         ], [
             'attribute_data' => $this->getAttributeData($product),
             'product_type_id' => $this->getDefaultProductTypeId(),
-            'status' => $product->get('legacy')->get('active') ? 'published' : 'draft',
-            'legacy_data' => $product->get('legacy'),
+            'status' => $product->get('status') ?? 'draft',
         ]);
 
-        $productModel->setCreatedAt($product->get('created_at'))->save();
 	    $product->put('productModel', $productModel);
 
         $resourceModel->destination_model_type = Product::class;

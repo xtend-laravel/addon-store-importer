@@ -29,10 +29,17 @@ class StoreImporterFilesTable extends Component implements Tables\Contracts\HasT
     protected function getTableColumns(): array
     {
         return [
+            Tables\Columns\BadgeColumn::make('type'),
             Tables\Columns\TextColumn::make('name'),
-            Tables\Columns\TextColumn::make('path'),
-            Tables\Columns\TextColumn::make('type'),
+            Tables\Columns\TextColumn::make('resources')
+                ->getStateUsing(function ($record) {
+                    $resources = $record->resources->pluck('type');
+                    return $resources->map(fn ($resource) => $resource->name)->implode(' | ');
+                }),
             Tables\Columns\TextColumn::make('created_at'),
+            Tables\Columns\TextColumn::make('updated_at'),
+            Tables\Columns\ViewColumn::make('progress')
+                ->view('adminhub::components.progress-bar'),
         ];
     }
 

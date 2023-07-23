@@ -6,11 +6,18 @@ use Illuminate\Http\File;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\TemporaryUploadedFile;
 use XtendLunar\Addons\StoreImporter\Enums\FileType;
 use XtendLunar\Addons\StoreImporter\Enums\ResourceGroup;
 use XtendLunar\Addons\StoreImporter\Enums\ResourceType;
+use XtendLunar\Addons\StoreImporter\Jobs\ProductSync;
+use XtendLunar\Addons\StoreImporter\Livewire\Components\Forms\Steps\FieldMapping;
+use XtendLunar\Addons\StoreImporter\Livewire\Components\Forms\Steps\Import;
+use XtendLunar\Addons\StoreImporter\Livewire\Components\Forms\Steps\Preview;
+use XtendLunar\Addons\StoreImporter\Livewire\Components\Forms\Steps\Resources;
 use XtendLunar\Addons\StoreImporter\Models\StoreImporterFile;
+use XtendLunar\Addons\StoreImporter\Models\StoreImporterResource;
 use XtendLunar\Addons\StoreImporter\Support\Import\FileImportInterface;
 use XtendLunar\Features\FormBuilder;
 
@@ -28,10 +35,28 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
 
     protected FileImportInterface $fileImporter;
 
+    protected string $view = 'adminhub::livewire.forms.wizard';
+
+    protected Wizard $wizard;
+
     protected $listeners = [
         'upload:finished' => 'handleFileUploaded',
         'updateFieldMap' => 'updateFieldMap',
+        'previousStep',
+        'nextStep',
+        'import',
     ];
+
+    public function bootIfNotBooted()
+    {
+        $this->wizard = Wizard::make()
+            ->steps([
+                FieldMapping::class,
+                Resources::class,
+                Preview::class,
+                Import::class,
+            ]);
+    }
 
     public function mount(): void
     {
@@ -41,6 +66,73 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
             $this->file = Storage::path($this->model->key);;
             $this->setFileImporterHeaders();
         }
+    }
+
+    public function previousStep(): void
+    {
+        $this->wizard->previousStep();
+    }
+
+    public function nextStep(): void
+    {
+        if ($this->wizard->currentStep() === 0) {
+            $this->validate();
+            $this->createResourcesFieldMap();
+        }
+
+        $this->wizard->nextStep();
+    }
+
+    public function import(): void
+    {
+        $this->fileImporter = resolve(FileImportInterface::class, [
+            'file' => $this->file,
+        ]);
+
+        // @todo Move all this logic to its own class
+        $rows = $this->fileImporter->getRows();
+        $this->syncProductRows($rows);
+    }
+
+    protected function syncProductRows(Collection $rows): void
+    {
+        $productResource = $this->model->resources()->where('type', ResourceType::Products)->sole();
+
+        $rows
+            ->filter(fn (array $rowProperties) => $rowProperties['Primary'] === 'checked')
+            ->each(function(array $rowProperties) use ($productResource, $rows) {
+                $productRow = $this->getProductRow($productResource, $rowProperties);
+
+                $productRow['product_variants'] = $rows->filter(function (array $rowProperties) use ($productResource, $productRow) {
+                    $variantRow = $this->getProductRow($productResource, $rowProperties);
+                    return $variantRow['product_variant_base_sku'] === $productRow['product_variant_base_sku'];
+                })->map(function (array $rowProperties) use ($productResource) {
+                    $variantRow = $this->getProductRow($productResource, $rowProperties);
+                    return $variantRow;
+                });
+
+                ProductSync::dispatchSync($productResource, $productRow);
+            });
+    }
+
+    protected function getProductRow(StoreImporterResource $productResource, array $rowProperties): array
+    {
+        return collect($rowProperties)
+            ->flatMap(fn ($value, $key) => [Str::slug($key, '_') => $value])
+            ->filter(fn ($value, $key) => $productResource->field_map[$key] ?? false)
+            ->flatMap(function ($value, $key) use ($productResource) {
+                $field = $productResource->field_map[$key];
+                if (in_array($field, ['product_feature', 'product_option', 'product_images', 'product_collections'])) {
+                    if (in_array($field, ['product_feature', 'product_option'])) {
+                        $field .= '_'.$key;
+                    }
+                    $value = Str::of($value)->contains(',')
+                        ? Str::of($value)->explode(',')->map(fn ($value) => trim($value))
+                        : $value;
+                }
+                return [$field => $value];
+            })
+            ->toArray();
     }
 
     public function updateFieldMap($fieldMap): void
@@ -61,13 +153,7 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
     protected function schema(): array
     {
         return [
-            FormBuilder\Fields\Fileupload::make('key')
-                ->label('CSV Input File')
-                ->required(),
-            FormBuilder\Fields\FieldMap::make('fields')
-                ->label('Field Map')
-                ->fieldMap($this->getMappedResourceFieldGroups())
-                ->required(),
+            ...resolve($this->wizard->getSteps()[$this->wizard->currentStep()])->schema(),
         ];
     }
 
@@ -156,43 +242,6 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
                 ])->toArray()
             );
         }
-    }
-
-    protected function getMappedResourceFieldGroups(): array
-    {
-        return collect(ResourceType::cases())
-            ->mapWithKeys(fn (ResourceType $resourceType) => [
-                $resourceType->name => $this->getMappedResourceFields($resourceType),
-            ])->toArray();
-    }
-
-    protected function getMappedResourceFields(ResourceType $resourceType): array
-    {
-        return match ($resourceType->value) {
-            ResourceType::Products->value => [
-                'options' => [
-                    'sku' => 'SKU',
-                    'name' => 'Name',
-                    'slug' => 'Slug',
-                    'description' => 'Description',
-                    'price' => 'Price',
-                ],
-            ],
-            ResourceType::Categories->value => [
-                'options' => [
-                    'name' => 'Name',
-                    'slug' => 'Slug',
-                    'description' => 'Description',
-                ],
-            ],
-            ResourceType::Brands->value => [
-                'options' => [
-                    'name' => 'Name',
-                    'description' => 'Description',
-                ],
-            ],
-            default => [],
-        };
     }
 
     protected function fileResources(): Collection

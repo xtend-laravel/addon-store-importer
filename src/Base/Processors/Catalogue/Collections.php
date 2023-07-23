@@ -6,7 +6,7 @@ use Illuminate\Support\Collection;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Processor;
 use XtendLunar\Addons\StoreImporter\Models\StoreImporterResourceModel;
 
-class CollectionAttach extends Processor
+class Collections extends Processor
 {
     public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
     {

@@ -14,7 +14,7 @@ use Lunar\Models\TaxClass;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Processor;
 use XtendLunar\Addons\StoreImporter\Models\StoreImporterResourceModel;
 
-class ProductVariantSave extends Processor
+class ProductVariants extends Processor
 {
     protected TaxClass $taxClass;
 

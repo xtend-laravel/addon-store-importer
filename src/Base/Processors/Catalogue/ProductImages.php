@@ -10,7 +10,7 @@ use XtendLunar\Addons\StoreImporter\Base\Processors\Processor;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use XtendLunar\Addons\StoreImporter\Models\StoreImporterResourceModel;
 
-class ProductImageSave extends Processor
+class ProductImages extends Processor
 {
     public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
     {

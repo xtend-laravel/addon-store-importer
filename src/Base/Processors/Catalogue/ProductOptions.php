@@ -10,7 +10,7 @@ use XtendLunar\Addons\StoreImporter\Models\StoreImporterResourceModel;
 use XtendLunar\Features\ProductFeatures\Models\ProductFeature;
 use XtendLunar\Features\ProductFeatures\Models\ProductFeatureValue;
 
-class ProductFeatureValueSave extends Processor
+class ProductOptions extends Processor
 {
     protected TaxClass $taxClass;
 
