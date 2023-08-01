@@ -2,20 +2,53 @@
 
 namespace XtendLunar\Addons\StoreImporter\Concerns;
 
-use Illuminate\Database\Eloquent\Model;
+use Xtend\Extensions\Lunar\Core\Models\Product;
+use XtendLunar\Addons\StoreImporter\Enums\ResourceModelStatus;
+use XtendLunar\Addons\StoreImporter\Models\StoreImporterResource;
 use XtendLunar\Addons\StoreImporter\Models\StoreImporterResourceModel;
 
 trait InteractsWithResourceModel
 {
-    protected StoreImporterResourceModel|Model $resourceModel;
+    protected StoreImporterResourceModel $resourceModel;
 
-    public function getResourceModel(): StoreImporterResourceModel|Model
+    /**
+     * @throws \Exception
+     */
+    public function setResourceModelByKey(
+        StoreImporterResource $resource,
+        $queryKey = 'id',
+        $queryValue = null,
+    ): void
     {
-        return $this->resourceModel;
+        $model = match ($resource->type->value) {
+            'products' => Product::query()->firstWhere($queryKey, $queryValue),
+            default => throw new \Exception('Resource type not supported'),
+        };
+
+        $resourceModel = $model
+            ? $resource->models()->firstOrCreate([
+                'model_type' => $model->getMorphClass(),
+                'model_id' => $model->getKey(),
+            ])
+            : $this->prepareResourceModel($resource);
+
+        $this->resourceModel = $resourceModel;
     }
 
-    public function setResourceModel(StoreImporterResourceModel|Model $resourceModel): void
+    protected function prepareResourceModel(StoreImporterResource $resource): StoreImporterResourceModel
     {
-        $this->resourceModel = $resourceModel;
+        $resource->models()->whereNull([
+            'model_type',
+            'model_id',
+        ])->delete();
+
+        return $resource->models()->create([
+            'status' => ResourceModelStatus::Pending,
+        ]);
+    }
+
+    public function getResourceModel(): StoreImporterResourceModel
+    {
+        return $this->resourceModel;
     }
 }

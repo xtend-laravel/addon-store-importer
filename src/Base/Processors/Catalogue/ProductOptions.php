@@ -2,48 +2,56 @@
 
 namespace XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
-use Lunar\Models\Currency;
-use Lunar\Models\TaxClass;
+use Xtend\Extensions\Lunar\Core\Models\ProductOption;
+use XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue\Concerns\InteractsWithProductModel;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Processor;
 use XtendLunar\Addons\StoreImporter\Models\StoreImporterResourceModel;
-use XtendLunar\Features\ProductFeatures\Models\ProductFeature;
-use XtendLunar\Features\ProductFeatures\Models\ProductFeatureValue;
 
 class ProductOptions extends Processor
 {
-    protected TaxClass $taxClass;
+    use InteractsWithProductModel;
 
-    protected Currency $currency;
+    protected Collection $optionValues;
 
-    public function __construct()
+    public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
     {
-        $this->taxClass = TaxClass::getDefault();
-        $this->currency = Currency::getDefault();
+        $this->optionValues = collect();
+        $this->setProductModel($product->get('productModel'));
+
+        $options = collect($product->get('options'))->map(
+            fn (array $option, $handle) => $this->getOption($option, $handle)
+        );
+
+        if ($options->isNotEmpty()) {
+            $options->each(function (ProductOption $option) use ($product) {
+                $handle = $option->handle;
+                $values = collect($product->get('options')[$handle]['values'] ?? []);
+                $values->each(function (array $value) use ($option) {
+                    $optionValue = $option->values()->updateOrCreate([
+                        'name->en' => $value['name']->getValue()->get('en')->getValue(),
+                    ], Arr::except($value, ['name']));
+                    $this->optionValues->push($optionValue);
+                });
+            });
+
+            $product->put('optionValues', $this->optionValues->pluck('id'));
+        }
     }
 
-    public function process(Collection $product, ?StoreImporterResourceModel $resourceModel = null): mixed
+    protected function getOption(array $option, string $handle): ProductOption
     {
-        /** @var \Lunar\Models\Product $productModel */
-        $productModel = $product->get('productModel');
+        $query = ProductOption::query()->where('handle', $handle);
 
-        if (! $product->has('features') || (! ProductFeature::count() && ! ProductFeatureValue::count())) {
-            return $product;
-        }
-
-        if ($features = $product->get('features')) {
-            /** @var \Illuminate\Database\Eloquent\Relations\BelongsToMany $relation */
-            $relation = $productModel->featureValues();
-            $relation->sync($this->lookupFeatureValueIds($features));
-        }
-
-        return [$product];
-    }
-
-    protected function lookupFeatureValueIds(array $features): Collection
-    {
-        return ProductFeatureValue
-            ::whereIn('legacy_data->id', collect($features)->pluck('id_feature_value'))
-            ->pluck('id');
+        /** @var Builder | ProductOption $query */
+        return $query->exists()
+            ? $query->first()
+            : ProductOption::create([
+                'name' => $option['name'],
+                'label' => $option['label'],
+                'handle' => $handle,
+            ]);
     }
 }

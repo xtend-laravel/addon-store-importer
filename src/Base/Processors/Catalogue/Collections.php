@@ -2,31 +2,62 @@
 
 namespace XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+use Lunar\FieldTypes\Text;
+use Lunar\FieldTypes\TranslatedText;
+use Lunar\Models\CollectionGroup;
+use Xtend\Extensions\Lunar\Core\Models\Collection as CollectionModel;
+use XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue\Concerns\InteractsWithProductModel;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Processor;
 use XtendLunar\Addons\StoreImporter\Models\StoreImporterResourceModel;
 
 class Collections extends Processor
 {
+    use InteractsWithProductModel;
+
     public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
     {
-        /** @var \Lunar\Models\Product $productModel */
-        $productModel = $product->get('productModel');
-        $categoryIds = collect($product->get('categories'))->pluck('id');
+        $this->setProductModel($product->get('productModel'));
 
-        $collections = $categoryIds->map(
-            fn ($categoryId) => \Xtend\Extensions\Lunar\Core\Models\Collection::where('legacy_data->id', $categoryId)->first()
-        )->filter();
+        $collections = collect($product->get('collections'))->map(
+            fn (array $collections, $group) => collect($collections)->filter()->map(
+                fn (string $collection) => $this->getCollection($collection, $group)
+            )
+        )->flatten();
 
         if ($collections->isNotEmpty()) {
+            $this->getProductModel()->collections()->sync($collections->pluck('id'));
+            $this->getProductModel()->primary_category_id = $collections->pluck('id')->first() ?? null;
+            $this->getProductModel()->save();
+            $this->getProductModel()->refresh();
 
-            $productModel->collections()->sync($collections->pluck('id'));
-
-            $productModel->primary_category_id = $collections->pluck('id')->last() ?? null;
-            $productModel->save();
-
-            $productModel->refresh();
+            $productModel = $this->getProductModel();
             $product->put('productModel', $productModel);
         }
+    }
+
+    protected function getCollection(string $collection, string $group): CollectionModel
+    {
+        $collectionGroup = CollectionGroup::firstOrCreate([
+            'name' => Str::headline($group),
+            'handle' => $group,
+        ]);
+
+        $query = CollectionModel::query()
+            ->whereJsonContains('attribute_data->name->value->en', $collection);
+
+        /** @var Builder | CollectionModel $query */
+        return $query->exists()
+            ? $query->first()
+            : CollectionModel::create([
+                'collection_group_id' => $collectionGroup->id,
+                'attribute_data' => [
+                    'name' => new TranslatedText([
+                        'en' => new Text($collection),
+                    ]),
+                ],
+            ]);
     }
 }

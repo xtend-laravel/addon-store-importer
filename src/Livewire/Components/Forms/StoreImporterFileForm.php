@@ -96,6 +96,7 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
 
     protected function syncProductRows(Collection $rows): void
     {
+        /** @var StoreImporterResource $productResource */
         $productResource = $this->model->resources()->where('type', ResourceType::Products)->sole();
 
         $rows
@@ -105,12 +106,13 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
 
                 $productRow['product_variants'] = $rows->filter(function (array $rowProperties) use ($productResource, $productRow) {
                     $variantRow = $this->getProductRow($productResource, $rowProperties);
-                    return $variantRow['product_variant_base_sku'] === $productRow['product_variant_base_sku'];
+                    return $variantRow['product_sku'] === $productRow['product_sku'];
                 })->map(function (array $rowProperties) use ($productResource) {
                     $variantRow = $this->getProductRow($productResource, $rowProperties);
                     return $variantRow;
                 });
 
+                //ProductSync::dispatch($productResource, $productRow)->onQueue('store-importer');
                 ProductSync::dispatchSync($productResource, $productRow);
             });
     }
@@ -123,12 +125,12 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
             ->flatMap(function ($value, $key) use ($productResource) {
                 $field = $productResource->field_map[$key];
                 if (in_array($field, ['product_feature', 'product_option', 'product_images', 'product_collections'])) {
-                    if (in_array($field, ['product_feature', 'product_option'])) {
+                    if (in_array($field, ['product_feature', 'product_option', 'product_collections'])) {
                         $field .= '_'.$key;
                     }
                     $value = Str::of($value)->contains(',')
                         ? Str::of($value)->explode(',')->map(fn ($value) => trim($value))
-                        : $value;
+                        : [$value];
                 }
                 return [$field => $value];
             })

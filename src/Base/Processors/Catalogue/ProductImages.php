@@ -5,39 +5,40 @@ namespace XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Lunar\Models\Product;
+use XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue\Concerns\InteractsWithProductModel;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Processor;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use XtendLunar\Addons\StoreImporter\Models\StoreImporterResourceModel;
 
 class ProductImages extends Processor
 {
+    use InteractsWithProductModel;
+
     public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
     {
-        /** @var \Lunar\Models\Product $productModel */
-        $productModel = $product->get('productModel');
+        $this->setProductModel($product->get('productModel'));
+
         $images = collect($product->get('images'));
         if ($images->isEmpty()) {
             return;
         }
 
         $images->each(
-            fn ($image, $key) => $this->saveImage($image, $productModel, $key),
+            fn ($image, $key) => $this->saveImage($image, $key),
         );
     }
 
-    protected function saveImage(string $image, Product $productModel, int $key): void
+    protected function saveImage(string $image, int $key): void
     {
-        // @todo Check if image exists note remotely is too slow
         if (!Http::get($image)->ok()) {
 			return;
 		}
 
-        if ($this->imageExists($image, $productModel)) {
+        if ($this->imageExists($image)) {
             return;
         }
 
-        $media = $productModel
+        $media = $this->getProductModel()
             ->addMediaFromUrl($image)
             ->toMediaCollection('images');
 
@@ -45,12 +46,12 @@ class ProductImages extends Processor
         $media->save();
     }
 
-    protected function imageExists(string $image, Product $productModel): bool
+    protected function imageExists(string $image): bool
     {
         // @todo Allow to replace image on force update?
         $filename = basename(parse_url($image, PHP_URL_PATH));
 
-        return $productModel->getMedia('products')->map(
+        return $this->getProductModel()->getMedia('products')->map(
             fn (Media $media) => Str::of($media->file_name)->beforeLast('.')
         )->contains($filename);
     }

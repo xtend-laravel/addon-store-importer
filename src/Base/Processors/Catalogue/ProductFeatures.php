@@ -2,48 +2,50 @@
 
 namespace XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
-use Lunar\Models\Currency;
-use Lunar\Models\TaxClass;
+use Xtend\Extensions\Lunar\Core\Models\ProductOption;
+use XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue\Concerns\InteractsWithProductModel;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Processor;
 use XtendLunar\Addons\StoreImporter\Models\StoreImporterResourceModel;
 use XtendLunar\Features\ProductFeatures\Models\ProductFeature;
-use XtendLunar\Features\ProductFeatures\Models\ProductFeatureValue;
 
 class ProductFeatures extends Processor
 {
-    protected TaxClass $taxClass;
+    use InteractsWithProductModel;
 
-    protected Currency $currency;
-
-    public function __construct()
+    public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
     {
-        $this->taxClass = TaxClass::getDefault();
-        $this->currency = Currency::getDefault();
+        $this->setProductModel($product->get('productModel'));
+
+        $features = collect($product->get('features'))->map(
+            fn (array $feature, $handle) => $this->getFeature($feature, $handle)
+        );
+
+        if ($features->isNotEmpty()) {
+            $features->each(function (ProductFeature $feature) use ($product) {
+                $handle = $feature->handle;
+                $values = collect($product->get('features')[$handle]['values'] ?? []);
+                $values->each(function (array $value) use ($feature) {
+                    $feature->values()->updateOrCreate([
+                        'name->en' => $value['name']->getValue()->get('en')->getValue(),
+                    ], Arr::except($value, ['name']));
+                });
+            });
+        }
     }
 
-    public function process(Collection $product, ?StoreImporterResourceModel $resourceModel = null): mixed
+    protected function getFeature(array $feature, string $handle): ProductFeature
     {
-        /** @var \Lunar\Models\Product $productModel */
-        $productModel = $product->get('productModel');
+        $query = ProductFeature::query()->where('handle', $handle);
 
-        if (! $product->has('features') || (! ProductFeature::count() && ! ProductFeatureValue::count())) {
-            return $product;
-        }
-
-        if ($features = $product->get('features')) {
-            /** @var \Illuminate\Database\Eloquent\Relations\BelongsToMany $relation */
-            $relation = $productModel->featureValues();
-            $relation->sync($this->lookupFeatureValueIds($features));
-        }
-
-        return [$product];
-    }
-
-    protected function lookupFeatureValueIds(array $features): Collection
-    {
-        return ProductFeatureValue
-            ::whereIn('legacy_data->id', collect($features)->pluck('id_feature_value'))
-            ->pluck('id');
+        /** @var Builder | ProductFeature $query */
+        return $query->exists()
+            ? $query->first()
+            : ProductFeature::create([
+                'name' => $feature['name'],
+                'handle' => $handle,
+            ]);
     }
 }

@@ -38,7 +38,7 @@ class FieldMapping implements StepInterface
                 'options' => [
                     'product_brand_id' => 'Brand Association (id / name)',
                     'product_type_id' => 'Product Type Association (id / name)',
-                    'product_variant_base_sku' => 'Base SKU',
+                    'product_sku' => 'Base SKU',
                     'product_variant_sku' => 'Variant SKU',
                     'product_variant_price' => 'Variant Price',
                     'product_variant_primary' => 'Variant Primary',
