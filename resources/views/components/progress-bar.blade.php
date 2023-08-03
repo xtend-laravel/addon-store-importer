@@ -1,16 +1,16 @@
 <div
   x-data="{
     interval: null,
-    progress: 0,
+    progress: 100,
     init() {
-      $nextTick(() => {
-        this.interval = setInterval(() => {
-          this.progress = this.progress + 1
-          if (this.progress >= 100) {
-            clearInterval(this.interval)
-          }
-        }, 100)
-      })
+{{--      $nextTick(() => {--}}
+{{--        this.interval = setInterval(() => {--}}
+{{--          this.progress = this.progress + 1--}}
+{{--          if (this.progress >= 100) {--}}
+{{--            clearInterval(this.interval)--}}
+{{--          }--}}
+{{--        }, 100)--}}
+{{--      })--}}
     }
   }"
   class="w-full bg-gray-200 rounded-full dark:bg-neutral-600 mr-10">
