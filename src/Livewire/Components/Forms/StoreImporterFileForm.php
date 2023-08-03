@@ -104,16 +104,21 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
             ->each(function(array $rowProperties) use ($productResource, $rows) {
                 $productRow = $this->getProductRow($productResource, $rowProperties);
 
-                $productRow['product_variants'] = $rows->filter(function (array $rowProperties) use ($productResource, $productRow) {
+                /** @var Collection $variants */
+                $variants = $rows->filter(function (array $rowProperties) use ($productResource, $productRow) {
                     $variantRow = $this->getProductRow($productResource, $rowProperties);
                     return $variantRow['product_sku'] === $productRow['product_sku'];
                 })->map(function (array $rowProperties) use ($productResource) {
                     $variantRow = $this->getProductRow($productResource, $rowProperties);
-                    return $variantRow;
+                    return collect($variantRow)->filter(fn ($value, $key) => Str::contains($key, ['_variant', '_option', '_images']));
                 });
 
-                //ProductSync::dispatch($productResource, $productRow)->onQueue('store-importer');
-                ProductSync::dispatchSync($productResource, $productRow);
+                $images = $variants->pluck('product_images')->toArray();
+                $productRow['variants'] = $variants->toArray();
+                $productRow['product_images'] = $images;
+
+                ProductSync::dispatch($productResource, $productRow);
+                //ProductSync::dispatchSync($productResource, $productRow);
             });
     }
 
@@ -184,7 +189,9 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
 
         $this->headers = collect($this->fileImporter->getHeaders())->map(fn ($header, $key) => [
             'label' => $header,
-            'value' => $this->model->exists ? $this->getMappedValue($key) : null,
+            'value' => $this->model->exists
+                ? $this->getMappedValue($key)
+                : $this->getDefaultMappedValue($key),
         ])->toArray();
 
         $this->fields = $this->headers;
@@ -197,6 +204,26 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
             ->pluck('field_map')
             ->collapse()
             ->first(fn ($value, $field) => $field === $key);
+    }
+
+    protected function getDefaultMappedValue($key): ?string
+    {
+        $fieldMap = collect([
+            'name' => 'product_name',
+            'size' => 'product_option',
+            'color' => 'product_option',
+            'price' => 'product_price_default',
+            'style' => 'product_collections',
+            'design' => 'product_feature',
+            'fabric' => 'product_feature',
+            'images' => 'product_images',
+            'primary' => 'product_variant_primary',
+            'base_sku' => 'product_sku',
+            'featured' => 'product_collections',
+            'categories' => 'product_collections',
+        ]);
+
+        return $this->getMappedValue($key) ?? $fieldMap->first(fn ($value, $field) => $field === $key);
     }
 
     public function create(): void
