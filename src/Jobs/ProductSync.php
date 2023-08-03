@@ -3,13 +3,11 @@
 namespace XtendLunar\Addons\StoreImporter\Jobs;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Lunar\FieldTypes\Text;
 use Lunar\FieldTypes\TranslatedText;
@@ -19,8 +17,9 @@ use XtendLunar\Addons\StoreImporter\Concerns\InteractsWithPipeline;
 use XtendLunar\Addons\StoreImporter\Concerns\InteractsWithResourceModel;
 use XtendLunar\Addons\StoreImporter\Enums\ResourceModelStatus;
 use XtendLunar\Addons\StoreImporter\Models\StoreImporterResource;
+use XtendLunar\Addons\StoreImporter\Models\StoreImporterResourceModel;
 
-class ProductSync implements ShouldQueue, ShouldBeUnique
+class ProductSync implements ShouldQueue
 {
     use Dispatchable;
     use InteractsWithDebug;
@@ -31,6 +30,10 @@ class ProductSync implements ShouldQueue, ShouldBeUnique
     use SerializesModels;
 
     protected Collection $product;
+
+    public $tries = 10;
+
+    public $timeout = 3600;
 
     /**
      * Create a new job instance.
@@ -60,7 +63,7 @@ class ProductSync implements ShouldQueue, ShouldBeUnique
         $this->benchmark([
             'prepare' => fn() => $this->prepare(),
             'sync' => fn() => $this->product->isNotEmpty()
-                ? DB::transaction(fn() => $this->sync())
+                ? $this->sync()
                 : null,
         ])->log();
     }
@@ -74,7 +77,6 @@ class ProductSync implements ShouldQueue, ShouldBeUnique
             'prepare.collections' => fn() => $this->prepareCollections(),
             'prepare.options' => fn() => $this->prepareOptions(),
             'prepare.features' => fn() => $this->prepareFeatures(),
-            'prepare.variants' => fn() => $this->prepareVariants(),
             'prepare.images' => fn() => $this->prepareProductImages(),
         ])->log();
     }
@@ -89,6 +91,9 @@ class ProductSync implements ShouldQueue, ShouldBeUnique
 
         $this->product->put('sku', $this->productRow['product_sku'] ?? null);
         $this->product->put('status', $this->productRow['product_status'] ?? 'published');
+        $this->product->put('prices', [
+            'default' => preg_replace('/[^0-9]/', '', $this->productRow['product_price_default']),
+        ]);
     }
 
     protected function prepareCollections(): void
@@ -109,33 +114,37 @@ class ProductSync implements ShouldQueue, ShouldBeUnique
 
     protected function prepareOptions(): void
     {
-        $options = collect($this->productRow)
-            ->filter(fn($value, $key) => Str::startsWith($key, 'product_option_'))
+        $options = collect($this->productRow['variants'])
             ->flatMap(
-                function ($values, $option) {
-                    $option = Str::of($option)->after('product_option_')->value();
-                    return [
-                        $option => [
-                            'name' => new TranslatedText([
-                                'en' => new Text(Str::headline($option)),
-                            ]),
-                            'label' => new TranslatedText([
-                                'en' => new Text(Str::headline($option)),
-                            ]),
-                            'values' => collect($values)->map(
-                                fn (string $value) => $this->prepareOptionValue($option, $value),
-                            )->filter(),
-                        ],
-                    ];
-                },
+                fn (array $variant) => collect([
+                    collect($variant)
+                        ->filter(fn ($value, $key) => Str::startsWith($key, 'product_option_'))
+                        ->flatMap(
+                            function ($values, $key) {
+                                $handle = Str::of($key)->after('product_option_')->value();
+                                return [
+                                    $handle => collect($values)->map(
+                                        fn(string $value) => $this->prepareOptionValue($handle, $value),
+                                    )->filter()->toArray(),
+                                ];
+                            },
+                        )
+                        ->merge([
+                            'images' => collect($variant['product_images'])
+                                ->flatMap(fn (string $image) => Str::of($image)->matchAll('/\((https?:\/\/[^)]+)\)/'))
+                                ->toArray(),
+                        ])
+                        ->filter()
+                        ->toArray(),
+                ])->toArray(),
             );
 
         $this->product->put('options', $options);
     }
 
-    protected function prepareOptionValue(string $option, string $value): array
+    protected function prepareOptionValue(string $handle, string $value): array
     {
-        if (Str::of($option)->contains('color')) {
+        if ($handle === 'color') {
             $color = Str::of($value)->contains('|')
                 ? Str::of($value)->explode('|')->map(
                     function (string $color) {
@@ -157,9 +166,7 @@ class ProductSync implements ShouldQueue, ShouldBeUnique
             $name = $color->pluck('name')->implode(' ');
 
             return [
-                'name' => new TranslatedText([
-                    'en' => new Text(Str::headline($name)),
-                ]),
+                'name' => $name,
                 'color' => $primaryColor ?? null,
                 'primary_color' => $primaryColor ?? null,
                 'secondary_color' => $secondaryColor ?? null,
@@ -168,9 +175,7 @@ class ProductSync implements ShouldQueue, ShouldBeUnique
         }
 
         return [
-            'name' => new TranslatedText([
-                'en' => new Text($value),
-            ]),
+            'name' => $value,
         ];
     }
 
@@ -207,60 +212,19 @@ class ProductSync implements ShouldQueue, ShouldBeUnique
         ];
     }
 
-    protected function prepareVariants(): void
-    {
-        $variants = collect($this->productRow['product_variants'])
-            ->transform(
-                fn (array $variants) => collect($variants)->flatMap(
-                    function ($variant, $key) {
-                        $key = Str::of($key)->after('product_variant_')->value();
-                        return [$key => $variant];
-                    },
-                )->toArray(),
-            );
-
-        $variants->transform(
-            fn (array $variant) => collect([
-                'tax_class_id' => $variant['tax_class_id'] ?? null,
-                'base' => $variant['base'] ?? false,
-                'primary' => $variant['primary'] ?? false,
-                'unit_quantity' => $variant['unit_quantity'] ?? 1,
-                'sku' => $variant['sku'] ?? null,
-                'gtin' => $variant['gtin'] ?? null,
-                'mpn' => $variant['mpn'] ?? null,
-                'length_value' => $variant['length_value'] ?? null,
-                'length_unit' => $variant['length_unit'] ?? null,
-                'width_value' => $variant['width_value'] ?? null,
-                'width_unit' => $variant['width_unit'] ?? null,
-                'height_value' => $variant['height_value'] ?? null,
-                'height_unit' => $variant['height_unit'] ?? null,
-                'weight_value' => $variant['weight_value'] ?? null,
-                'weight_unit' => $variant['weight_unit'] ?? null,
-                'volume_value' => $variant['volume_value'] ?? null,
-                'shippable' => $variant['shippable'] ?? true,
-                'stock' => $variant['stock'] ?? 99999,
-                'backorder' => $variant['backorder'] ?? false,
-                'purchasable' => $variant['purchasable'] ?? 'always',
-            ]),
-        );
-
-        $this->product->put('variants', $variants);
-        $this->product->put('prices', [
-            'default' => preg_replace('/[^0-9]/', '', $this->productRow['product_price_default']),
-        ]);
-    }
-
     protected function prepareProductImages(): void
     {
         // @todo Move this to a transformer class MarkdownImagesTransformer
         $images = collect($this->productRow['product_images'])
-            ->flatMap(fn (string $image) => Str::of($image)->matchAll('/\((https?:\/\/[^)]+)\)/'))
+            ->flatMap(fn (array $images, $key) => [
+                $key => collect($images)->flatMap(fn (string $image) => Str::of($image)->matchAll('/\((https?:\/\/[^)]+)\)/')),
+            ])
             ->toArray();
 
         $this->product->put('images', $images);
     }
 
-    protected function sync(): void
+    protected function sync(): StoreImporterResourceModel
     {
         $this->prepareThroughPipeline(
             passable: [
@@ -273,16 +237,13 @@ class ProductSync implements ShouldQueue, ShouldBeUnique
                 Processors\Catalogue\ProductOptions::class,
                 Processors\Catalogue\ProductFeatures::class,
                 Processors\Catalogue\ProductVariants::class,
-                //Processors\Catalogue\ProductImages::class,
+                Processors\Catalogue\ProductImages::class,
             ],
         );
 
         $this->resourceModel->status = ResourceModelStatus::Created;
         $this->resourceModel->save();
-    }
 
-    public function uniqueId(): string
-    {
-        return $this->productRow['product_sku'];
+        return $this->resourceModel;
     }
 }
