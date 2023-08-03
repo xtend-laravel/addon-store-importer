@@ -5,6 +5,9 @@ namespace XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+use Lunar\FieldTypes\Text;
+use Lunar\FieldTypes\TranslatedText;
 use Xtend\Extensions\Lunar\Core\Models\ProductOption;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue\Concerns\InteractsWithProductModel;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Processor;
@@ -21,37 +24,55 @@ class ProductOptions extends Processor
         $this->optionValues = collect();
         $this->setProductModel($product->get('productModel'));
 
-        $options = collect($product->get('options'))->map(
-            fn (array $option, $handle) => $this->getOption($option, $handle)
-        );
-
+        $options = $this->prepareOptions($product);
         if ($options->isNotEmpty()) {
-            $options->each(function (ProductOption $option) use ($product) {
-                $handle = $option->handle;
-                $values = collect($product->get('options')[$handle]['values'] ?? []);
-                $values->each(function (array $value) use ($option) {
-                    $optionValue = $option->values()->updateOrCreate([
-                        'name->en' => $value['name']->getValue()->get('en')->getValue(),
-                    ], Arr::except($value, ['name']));
-                    $this->optionValues->push($optionValue);
-                });
+            $options->each(function (Collection $values, string $handle) use ($product) {
+                $option = $this->createOptionByHandle($handle);
+                $this->createOptionValues($option, $values);
             });
 
             $product->put('optionValues', $this->optionValues->pluck('id'));
         }
     }
 
-    protected function getOption(array $option, string $handle): ProductOption
+    protected function createOptionByHandle(string $handle): ProductOption
     {
         $query = ProductOption::query()->where('handle', $handle);
+        $name = new TranslatedText([
+            'en' => new Text(Str::headline($handle)),
+        ]);
 
         /** @var Builder | ProductOption $query */
         return $query->exists()
             ? $query->first()
             : ProductOption::create([
-                'name' => $option['name'],
-                'label' => $option['label'],
+                'name' => $name,
+                'label' => $name,
                 'handle' => $handle,
             ]);
+    }
+
+    protected function createOptionValues(ProductOption $option, Collection $values): void
+    {
+        $values->each(function (array $value) use ($option) {
+            $optionValue = $option->values()->updateOrCreate([
+                'name->en' => $value['name'],
+            ], Arr::except($value, ['name']));
+
+            $this->optionValues->push($optionValue);
+        });
+    }
+
+    protected function prepareOptions(Collection $product): Collection
+    {
+        return collect($product->get('options'))
+            ->reduce(function ($carry, $option) {
+                unset($option['images']);
+                foreach ($option as $key => $values) {
+                    $carry[$key] ??= collect();
+                    $carry[$key] = $carry[$key]->merge($values)->unique();
+                }
+                return $carry;
+            }, collect());
     }
 }
