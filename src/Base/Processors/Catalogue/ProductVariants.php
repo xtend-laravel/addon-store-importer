@@ -2,9 +2,10 @@
 
 namespace XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue;
 
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
-use Lunar\Hub\Jobs\Products\GenerateVariants;
+use Lunar\Hub\Exceptions\InvalidProductValuesException;
 use Lunar\Models\Currency;
 use Lunar\Models\Price;
 use Lunar\Models\ProductOption;
@@ -36,18 +37,16 @@ class ProductVariants extends Processor
     {
         $this->setProductModel($product->get('productModel'));
 
-        if (! $product->has('variants') || (! ProductOption::count() && ! ProductOptionValue::count())) {
+        if (! ProductOption::count() && ! ProductOptionValue::count()) {
             throw new \Exception('Product options and values must be imported before variants.');
         }
 
-        /** @var Collection $variants */
-        $variants = $product->get('variants');
-
         $this->deleteVariants();
+        $this->createBaseVariant($product);
 
-        $variants
-            ->filter(fn ($variant) => filled($variant->get('sku')))
-            ->each(fn ($variant) => $this->saveVariant($variant, $product));
+        $optionValues = $product->get('optionValues');
+
+        $this->generateVariants($optionValues);
 
         $productModel = $this->getProductModel();
         $productModel = $productModel->refresh();
@@ -64,20 +63,17 @@ class ProductVariants extends Processor
         Schema::enableForeignKeyConstraints();
     }
 
-    protected function saveVariant(Collection $variant, Collection $product): void
+    protected function createBaseVariant(Collection $product): void
     {
         $prices = $product->get('prices');
 
         /** @var ProductVariant $variantModel */
-        $variantModel = ProductVariant::updateOrCreate([
-            'sku' => $variant->get('sku'),
-        ], [
+        $variantModel = ProductVariant::query()->create([
+            'sku' => $product->get('sku'),
+            'base' => true,
+            'stock' => $product->get('stock') ?? 99999,
             'product_id' => $this->getProductModel()->id,
-            'purchasable' => $variant->get('purchasable'),
-            'shippable' => $variant->get('shippable'),
-            'backorder' => $variant->get('backorder'),
             'tax_class_id' => $this->taxClass->id,
-            'stock' => $variant->get('stock'),
         ]);
 
         Price::updateOrCreate([
@@ -89,10 +85,95 @@ class ProductVariants extends Processor
             'price' => $prices['default'],
             'tier' => 1,
         ]);
+    }
 
-        $optionValues = $product->get('optionValues');
+    protected function generateVariants(Collection $optionValues): void
+    {
+        $valueModels = ProductOptionValue::findMany($optionValues);
 
-        // @todo Overwrite this job with our own custom implementation to include base and featured variants
-        GenerateVariants::dispatchSync($this->getProductModel(), $optionValues);
+        if ($valueModels->count() != count($optionValues)) {
+            throw new InvalidProductValuesException(
+                'One or more option values do not exist in the database'
+            );
+        }
+
+        $permutations = $this->getPermutations($optionValues);
+        $baseVariant = $this->getProductModel()->variants->first();
+
+        foreach ($permutations as $key => $optionsToCreate) {
+            $this->createVariant($baseVariant, $optionsToCreate, $key);
+        }
+
+        if ($baseVariant) {
+            $baseVariant->values()->detach();
+            $baseVariant->prices()->delete();
+            $baseVariant->delete();
+        }
+    }
+
+    protected function createVariant(ProductVariant $baseVariant, array $optionsToCreate, int $key): void
+    {
+        $variant = new ProductVariant();
+        $uoms = ['length', 'width', 'height', 'weight', 'volume'];
+
+        $attributesToCopy = [
+            'sku',
+            'gtin',
+            'mpn',
+            'ean',
+            'shippable',
+        ];
+
+        foreach ($uoms as $uom) {
+            $attributesToCopy[] = "{$uom}_value";
+            $attributesToCopy[] = "{$uom}_unit";
+        }
+
+        $attributes = $baseVariant->only($attributesToCopy);
+
+        foreach ($attributes as $attribute => $value) {
+            if ($rules[$attribute]['unique'] ?? false) {
+                $attributes[$attribute] = $attributes[$attribute].'-'.($key + 1);
+            }
+        }
+
+        $pricing = $baseVariant->prices->map(function ($price) {
+            return $price->only([
+                'customer_group_id',
+                'currency_id',
+                'price',
+                'compare_price',
+                'tier',
+            ]);
+        });
+
+        $variant->stock = $baseVariant->stock ?? 0;
+        $variant->product_id = $baseVariant->product_id;
+        $variant->tax_class_id = $baseVariant->tax_class_id;
+        $variant->attribute_data = $baseVariant->attribute_data;
+        $variant->fill($attributes);
+        $variant->save();
+        $variant->values()->attach($optionsToCreate);
+        $variant->prices()->createMany($pricing->toArray());
+    }
+
+    /**
+     * Gets permutations array from the option values.
+     *
+     * @return array
+     */
+    protected function getPermutations(Collection $optionValues)
+    {
+        return Arr::permutate(
+            ProductOptionValue::findMany($optionValues)
+                ->groupBy('product_option_id')
+                ->mapWithKeys(function ($values) {
+                    $optionId = $values->first()->product_option_id;
+
+                    return [$optionId => $values->map(function ($value) {
+                        return $value->id;
+                    })];
+                })->toArray()
+        );
     }
 }
