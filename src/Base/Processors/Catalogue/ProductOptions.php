@@ -33,7 +33,7 @@ class ProductOptions extends Processor
                 $this->createOptionValues($option, $values, $handle);
             });
 
-            $product->put('optionValues', $this->optionValues->pluck('id'));
+            $product->put('optionValues', $this->optionValues->pluck('id')->unique());
         }
     }
 
