@@ -114,6 +114,7 @@ class ProductSync implements ShouldQueue
 
     protected function prepareOptions(): void
     {
+        $this->mergeColorOptions();
         $options = collect($this->productRow['variants'])
             ->flatMap(
                 fn (array $variant) => collect([
@@ -123,9 +124,11 @@ class ProductSync implements ShouldQueue
                             function ($values, $key) {
                                 $handle = Str::of($key)->after('product_option_')->value();
                                 return [
-                                    $handle => collect($values)->map(
-                                        fn(string $value) => $this->prepareOptionValue($handle, $value),
-                                    )->filter()->toArray(),
+                                    $handle => $handle === 'color'
+                                        ? $this->prepareColorValues($handle, $values)
+                                        : collect($values)->map(
+                                            fn(string $value) => ['name' => $value],
+                                        )->filter()->toArray(),
                                 ];
                             },
                         )
@@ -142,40 +145,29 @@ class ProductSync implements ShouldQueue
         $this->product->put('options', $options);
     }
 
-    protected function prepareOptionValue(string $handle, string $value): array
+    protected function mergeColorOptions(): void
     {
-        if ($handle === 'color') {
-            $color = Str::of($value)->contains('|')
-                ? Str::of($value)->explode('|')->map(
-                    function (string $color) {
-                        $color = Str::of($color)->explode(':');
-                        return [
-                            'name' => trim($color->first()),
-                            'hex' => $color->last(),
-                        ];
-                    },
-                )
-                : collect(
-                    Str::of($value)->after(':')->value(),
-                );
+        // @todo this needs to be moved to a project transformer this logic should not be in the core product sync
+        $this->productRow['variants'] = collect($this->productRow['variants'])->map(
+            function (array $variant) {
+                $variant['product_option_color'] = [
+                    'name' => $variant['product_option_primary_color'][0],
+                    'colors' => $variant['product_option_color'],
+                ];
+                unset($variant['product_option_primary_color']);
+                return $variant;
+            },
+        );
+    }
 
-            $primaryColor = $color->first()['hex'] ?? null;
-            $secondaryColor = $color->get(1)['hex'] ?? null;
-            $tertiaryColor = $color->get(2)['hex'] ?? null;
-
-            $name = $color->pluck('name')->implode(' ');
-
-            return [
-                'name' => $name,
-                'color' => $primaryColor ?? null,
-                'primary_color' => $primaryColor ?? null,
-                'secondary_color' => $secondaryColor ?? null,
-                'tertiary_color' => $tertiaryColor ?? null,
-            ];
-        }
-
+    protected function prepareColorValues(string $handle, array $values): array
+    {
         return [
-            'name' => $value,
+            'name' => $values['name'],
+            'color' => $values['colors'][0] ?? null,
+            'primary_color' => $values['colors'][0] ?? null,
+            'secondary_color' => $values['colors'][1] ?? null,
+            'tertiary_color' => $values['colors'][2] ?? null,
         ];
     }
 
