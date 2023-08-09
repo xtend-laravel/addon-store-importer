@@ -124,11 +124,9 @@ class ProductSync implements ShouldQueue
                             function ($values, $key) {
                                 $handle = Str::of($key)->after('product_option_')->value();
                                 return [
-                                    $handle => $handle === 'color'
-                                        ? $this->prepareColorValues($handle, $values)
-                                        : collect($values)->map(
-                                            fn(string $value) => ['name' => $value],
-                                        )->filter()->toArray(),
+                                    $handle => collect($values)->map(
+                                        fn(mixed $value) => $this->prepareOptionValue($handle, $value),
+                                    )->filter()->toArray(),
                                 ];
                             },
                         )
@@ -151,8 +149,10 @@ class ProductSync implements ShouldQueue
         $this->productRow['variants'] = collect($this->productRow['variants'])->map(
             function (array $variant) {
                 $variant['product_option_color'] = [
-                    'name' => $variant['product_option_primary_color'][0],
-                    'colors' => $variant['product_option_color'],
+                    [
+                        'name' => $variant['product_option_primary_color'][0],
+                        'colors' => $variant['product_option_color'],
+                    ],
                 ];
                 unset($variant['product_option_primary_color']);
                 return $variant;
@@ -160,14 +160,20 @@ class ProductSync implements ShouldQueue
         );
     }
 
-    protected function prepareColorValues(string $handle, array $values): array
+    protected function prepareOptionValue(string $handle, mixed $value): array
     {
+        if ($handle === 'color') {
+            return [
+                'name' => $value['name'],
+                'color' => $value['colors'][0] ?? null,
+                'primary_color' => $value['colors'][0] ?? null,
+                'secondary_color' => $value['colors'][1] ?? null,
+                'tertiary_color' => $value['colors'][2] ?? null,
+            ];
+        }
+
         return [
-            'name' => $values['name'],
-            'color' => $values['colors'][0] ?? null,
-            'primary_color' => $values['colors'][0] ?? null,
-            'secondary_color' => $values['colors'][1] ?? null,
-            'tertiary_color' => $values['colors'][2] ?? null,
+            'name' => $value,
         ];
     }
 

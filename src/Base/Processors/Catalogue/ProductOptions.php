@@ -26,6 +26,7 @@ class ProductOptions extends Processor
         $this->setProductModel($product->get('productModel'));
 
         $options = $this->prepareOptions($product);
+
         if ($options->isNotEmpty()) {
             $options->each(function (Collection $values, string $handle) use ($product) {
                 $option = $this->createOptionByHandle($handle);
@@ -43,14 +44,6 @@ class ProductOptions extends Processor
             'en' => new Text(Str::headline($handle)),
         ]);
 
-        if (!$query->exists()) {
-            Log::driver('slack')->warning('Create new option', [
-                'name' => $name,
-                'label' => $name,
-                'handle' => $handle,
-            ]);
-        }
-
         /** @var Builder | ProductOption $query */
         return $query->exists()
             ? $query->first()
@@ -61,12 +54,8 @@ class ProductOptions extends Processor
             ]);
     }
 
-    protected function createOptionValues(ProductOption $option, Collection $values, string $handle): void
+    protected function createOptionValues(ProductOption $option, Collection $values): void
     {
-        if ($handle === 'color') {
-            $values = collect([$values->toArray()]);
-        }
-
         $values->each(function (array $value) use ($option) {
             $optionValue = $option->values()->updateOrCreate([
                 'name->en' => $value['name'],
@@ -83,7 +72,7 @@ class ProductOptions extends Processor
                 unset($option['images']);
                 foreach ($option as $key => $values) {
                     $carry[$key] ??= collect();
-                    $carry[$key] = $carry[$key]->merge($values)->unique();
+                    $carry[$key] = $carry[$key]->merge($values);
                 }
                 return $carry;
             }, collect());
