@@ -28,7 +28,7 @@ class ProductOptions extends Processor
         if ($options->isNotEmpty()) {
             $options->each(function (Collection $values, string $handle) use ($product) {
                 $option = $this->createOptionByHandle($handle);
-                $this->createOptionValues($option, $values);
+                $this->createOptionValues($option, $values, $handle);
             });
 
             $product->put('optionValues', $this->optionValues->pluck('id'));
@@ -52,8 +52,12 @@ class ProductOptions extends Processor
             ]);
     }
 
-    protected function createOptionValues(ProductOption $option, Collection $values): void
+    protected function createOptionValues(ProductOption $option, Collection $values, string $handle): void
     {
+        if ($handle === 'color') {
+            $values = collect([$values->toArray()]);
+        }
+
         $values->each(function (array $value) use ($option) {
             $optionValue = $option->values()->updateOrCreate([
                 'name->en' => $value['name'],
