@@ -5,6 +5,7 @@ namespace XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Lunar\FieldTypes\Text;
 use Lunar\FieldTypes\TranslatedText;
@@ -41,6 +42,14 @@ class ProductOptions extends Processor
         $name = new TranslatedText([
             'en' => new Text(Str::headline($handle)),
         ]);
+
+        if (!$query->exists()) {
+            Log::driver('slack')->warning('Create new option', [
+                'name' => $name,
+                'label' => $name,
+                'handle' => $handle,
+            ]);
+        }
 
         /** @var Builder | ProductOption $query */
         return $query->exists()
