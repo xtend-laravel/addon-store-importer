@@ -87,9 +87,13 @@ class ProductSync implements ShouldQueue
             'name' => new TranslatedText([
                 'en' => new Text($this->productRow['product_name'] ?? '---'),
             ]),
+            'description' => new TranslatedText([
+                'en' => new Text($this->productRow['product_description'] ?? '---'),
+            ]),
         ]));
 
         $this->product->put('sku', $this->productRow['product_sku'] ?? null);
+        $this->product->put('weight', $this->productRow['product_weight'] ?? null);
         $this->product->put('status', $this->productRow['product_status'] ?? 'published');
         $this->product->put('prices', [
             'default' => preg_replace('/[^0-9]/', '', $this->productRow['product_price_default']),

@@ -75,6 +75,8 @@ class ProductVariants extends Processor
         $variantModel = ProductVariant::query()->create([
             'sku' => $product->get('sku'),
             'base' => true,
+            'weight_value' => $product->get('weight') ?? 0,
+            'weight_unit' => 'lbs',
             'stock' => $product->get('stock') ?? 99999,
             'product_id' => $this->getProductModel()->id,
             'tax_class_id' => $this->taxClass->id,
@@ -118,6 +120,7 @@ class ProductVariants extends Processor
     protected function createVariant(ProductVariant $baseVariant, array $optionsToCreate, int $key): void
     {
         $variant = new ProductVariant();
+        $rules = config('lunar-hub.products', []);
         $uoms = ['length', 'width', 'height', 'weight', 'volume'];
 
         $attributesToCopy = [

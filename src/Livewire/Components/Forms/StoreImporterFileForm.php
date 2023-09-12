@@ -210,6 +210,7 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
     {
         $fieldMap = collect([
             'name' => 'product_name',
+            'description' => 'product_description',
             'size' => 'product_option',
             'color' => 'product_option',
             'primary_color' => 'product_option',
@@ -220,6 +221,7 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
             'images' => 'product_images',
             'primary' => 'product_variant_primary',
             'base_sku' => 'product_sku',
+            'weight' => 'product_weight',
             'featured' => 'product_collections',
             'categories' => 'product_collections',
         ]);
