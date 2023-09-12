@@ -52,6 +52,10 @@ class ProductVariants extends Processor
         $productModel = $productModel->refresh();
         $productModel->variant_default_id = $productModel->variants()->first()->id;
         $productModel->update();
+
+        ProductVariant::query()->find($productModel->variant_default_id)->update([
+            'base' => true,
+        ]);
     }
 
     protected function deleteVariants(): void

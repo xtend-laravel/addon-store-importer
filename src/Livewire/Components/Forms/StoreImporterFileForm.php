@@ -212,6 +212,7 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
             'name' => 'product_name',
             'size' => 'product_option',
             'color' => 'product_option',
+            'primary_color' => 'product_option',
             'price' => 'product_price_default',
             'style' => 'product_collections',
             'design' => 'product_feature',

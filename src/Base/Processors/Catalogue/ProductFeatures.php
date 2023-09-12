@@ -15,6 +15,8 @@ class ProductFeatures extends Processor
 {
     use InteractsWithProductModel;
 
+    protected array $featureValueIds = [];
+
     public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
     {
         $this->setProductModel($product->get('productModel'));
@@ -24,15 +26,21 @@ class ProductFeatures extends Processor
         );
 
         if ($features->isNotEmpty()) {
+            $this->getProductModel()->featureValues()->detach();
+
             $features->each(function (ProductFeature $feature) use ($product) {
                 $handle = $feature->handle;
                 $values = collect($product->get('features')[$handle]['values'] ?? []);
                 $values->each(function (array $value) use ($feature) {
-                    $feature->values()->updateOrCreate([
+                    $featureValue = $feature->values()->updateOrCreate([
                         'name->en' => $value['name']->getValue()->get('en')->getValue(),
                     ], Arr::except($value, ['name']));
+
+                    $this->featureValueIds[] = $featureValue->id;
                 });
             });
+
+            $this->getProductModel()->featureValues()->sync($this->featureValueIds);
         }
     }
 
