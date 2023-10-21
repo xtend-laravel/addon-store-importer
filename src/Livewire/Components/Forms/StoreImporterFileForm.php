@@ -8,6 +8,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\TemporaryUploadedFile;
+use Lunar\Models\Language;
 use XtendLunar\Addons\StoreImporter\Enums\FileType;
 use XtendLunar\Addons\StoreImporter\Enums\ResourceGroup;
 use XtendLunar\Addons\StoreImporter\Enums\ResourceType;
@@ -28,6 +29,10 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
     public array $fields = [];
 
     public array $fieldMap = [];
+
+    public array $fieldTranslations = [];
+
+    public array $languageIsoCodes = [];
 
     public File | TemporaryUploadedFile | UploadedFile | string $file;
 
@@ -105,11 +110,11 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
                 $productRow = $this->getProductRow($productResource, $rowProperties);
 
                 /** @var Collection $variants */
-                $variants = $rows->filter(function (array $rowProperties) use ($productResource, $productRow) {
-                    $variantRow = $this->getProductRow($productResource, $rowProperties);
+                $variants = $rows->filter(function (array $rowProperties, $rowIndex) use ($productResource, $productRow) {
+                    $variantRow = $this->getProductRow($productResource, $rowProperties, $rowIndex);
                     return $variantRow['product_sku'] === $productRow['product_sku'];
-                })->map(function (array $rowProperties) use ($productResource) {
-                    $variantRow = $this->getProductRow($productResource, $rowProperties);
+                })->map(function (array $rowProperties, $rowIndex) use ($productResource) {
+                    $variantRow = $this->getProductRow($productResource, $rowProperties, $rowIndex);
                     return collect($variantRow)->filter(fn ($value, $key) => Str::contains($key, ['_variant', '_option', '_images']));
                 });
 
@@ -118,16 +123,16 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
                 $productRow['product_images'] = $images;
 
                 ProductSync::dispatch($productResource, $productRow);
-                //ProductSync::dispatchSync($productResource, $productRow);
+                // ProductSync::dispatchSync($productResource, $productRow);
             });
     }
 
-    protected function getProductRow(StoreImporterResource $productResource, array $rowProperties): array
+    protected function getProductRow(StoreImporterResource $productResource, array $rowProperties, ?int $variantIndex = null): array
     {
         return collect($rowProperties)
             ->flatMap(fn ($value, $key) => [Str::slug($key, '_') => $value])
             ->filter(fn ($value, $key) => $productResource->field_map[$key] ?? false)
-            ->flatMap(function ($value, $key) use ($productResource) {
+            ->flatMap(function ($value, $key) use ($productResource, $rowProperties, $variantIndex) {
                 $field = $productResource->field_map[$key];
                 if (in_array($field, ['product_feature', 'product_option', 'product_images', 'product_collections'])) {
                     if (in_array($field, ['product_feature', 'product_option', 'product_collections'])) {
@@ -137,9 +142,42 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
                         ? Str::of($value)->explode(',')->map(fn ($value) => trim($value))
                         : [$value];
                 }
+
+                $rowKey = $rowProperties['Base SKU'];
+                if ($variantIndex) {
+                    $rowKey = $rowProperties['Base SKU'].'_'.$variantIndex;
+                }
+
+                if (Str::endsWith($key, $this->languageIsoCodes) && is_string($value)) {
+                    $langIso = Str::afterLast($key, '_');
+                    $this->fieldTranslations[$rowKey][$field][$langIso] ??= $value;
+                    return $this->fieldTranslations[$rowKey];
+                }
+
                 return [$field => $value];
             })
+            ->flatMap(function ($value, $key) use ($rowProperties, $variantIndex) {
+
+                $rowKey = $rowProperties['Base SKU'];
+                if ($variantIndex) {
+                    $rowKey = $rowProperties['Base SKU'].'_'.$variantIndex;
+                }
+
+                if (Str::endsWith($key, $this->languageIsoCodes) && is_array($value)) {
+                    $langIso = Str::afterLast($key, '_');
+                    $fieldName = Str::of($key)->beforeLast('_'.$langIso)->value();
+                    $this->fieldTranslations[$rowKey][$fieldName][$langIso] ??= $value[0] ?? $value;
+                    return [$fieldName => $this->fieldTranslations[$rowKey][$fieldName]];
+                }
+
+                return [$key => $value];
+            })
             ->toArray();
+    }
+
+    public function setTranslationsArray($value): array
+    {
+        return collect($value)->map(fn ($value, $key) => [$key => $value])->toArray();
     }
 
     public function updateFieldMap($fieldMap): void
@@ -179,6 +217,8 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
 
     protected function setFileImporterHeaders(): void
     {
+        $this->languageIsoCodes = Language::all()->pluck('code')->toArray();
+
         if (pathinfo($this->model->name, PATHINFO_EXTENSION) !== 'csv') {
             throw new \Exception('Currently only CSV files are supported.');
         }
@@ -226,7 +266,12 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
             'categories' => 'product_collections',
         ]);
 
-        return $this->getMappedValue($key) ?? $fieldMap->first(fn ($value, $field) => $field === $key);
+        return $this->getMappedValue($key) ?? $fieldMap->first(function ($value, $field) use ($key) {
+            if (Str::endsWith($key, $this->languageIsoCodes)) {
+                $key = Str::of($key)->beforeLast('_')->value();
+            }
+            return $field === $key;
+        });
     }
 
     public function create(): void

@@ -30,7 +30,7 @@ class ProductOptions extends Processor
         if ($options->isNotEmpty()) {
             $options->each(function (Collection $values, string $handle) use ($product) {
                 $option = $this->createOptionByHandle($handle);
-                $this->createOptionValues($option, $values, $handle);
+                $this->createOptionValues($option, $values);
             });
 
             $product->put('optionValues', $this->optionValues->pluck('id')->unique());
@@ -57,9 +57,15 @@ class ProductOptions extends Processor
     protected function createOptionValues(ProductOption $option, Collection $values): void
     {
         $values->each(function (array $value) use ($option) {
+            /** @var TranslatedText $name */
+            $name = $value['name'];
+            if ($name instanceof TranslatedText) {
+                $name = $name->getValue()->get('en')->getValue();
+            }
+
             $optionValue = $option->values()->updateOrCreate([
-                'name->en' => $value['name'],
-            ], Arr::except($value, ['name']));
+                'name->en' => $name,
+            ], $value);
 
             $this->optionValues->push($optionValue);
         });

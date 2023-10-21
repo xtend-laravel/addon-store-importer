@@ -84,12 +84,16 @@ class ProductSync implements ShouldQueue
     protected function prepareProduct(): void
     {
         $this->product->put('attribute_data', collect([
-            'name' => new TranslatedText([
-                'en' => new Text($this->productRow['product_name'] ?? '---'),
-            ]),
-            'description' => new TranslatedText([
-                'en' => new Text($this->productRow['product_description'] ?? '---'),
-            ]),
+            'name' => new TranslatedText(
+                collect($this->productRow['product_name'])->map(
+                    fn (string $value) => new Text($value),
+                ),
+            ),
+            'description' => new TranslatedText(
+                collect($this->productRow['product_description'])->map(
+                    fn (string $value) => new Text($value ?? '---'),
+                ),
+            ),
         ]));
 
         $this->product->put('sku', $this->productRow['product_sku'] ?? null);
@@ -154,7 +158,11 @@ class ProductSync implements ShouldQueue
             function (array $variant) {
                 $variant['product_option_color'] = [
                     [
-                        'name' => $variant['product_option_primary_color'][0],
+                        'name' => new TranslatedText(
+                            collect($variant['product_option_primary_color'])->map(
+                                fn (string $value) => new Text($value),
+                            ),
+                        ),
                         'colors' => $variant['product_option_color'],
                     ],
                 ];
@@ -177,7 +185,13 @@ class ProductSync implements ShouldQueue
         }
 
         return [
-            'name' => $value,
+            'name' => is_string($value)
+                ? new TranslatedText([
+                    'en' => new Text($value),
+                    'fr' => new Text($value),
+                    'ar' => new Text($value),
+                ])
+                : $value['name'],
         ];
     }
 
@@ -192,26 +206,21 @@ class ProductSync implements ShouldQueue
                         $feature => [
                             'name' => new TranslatedText([
                                 'en' => new Text(Str::headline($feature)),
+                                'fr' => new Text(Str::headline($feature)),
+                                'ar' => new Text(Str::headline($feature)),
                             ]),
                             'handle' => $feature,
-                            'values' => collect($values)->map(
-                                fn (string $value) => $this->prepareFeatureValue($value),
-                            )->filter(),
+                            'values' => new TranslatedText(
+                                collect($values)->map(
+                                    fn (string $value) => new Text($value),
+                                ),
+                            ),
                         ],
                     ];
                 },
             );
 
         $this->product->put('features', $features);
-    }
-
-    protected function prepareFeatureValue(string $value): array
-    {
-        return [
-            'name' => new TranslatedText([
-                'en' => new Text(Str::headline($value)),
-            ]),
-        ];
     }
 
     protected function prepareProductImages(): void

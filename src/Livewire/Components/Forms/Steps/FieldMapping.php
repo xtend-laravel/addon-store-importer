@@ -74,7 +74,7 @@ class FieldMapping implements StepInterface
                 'options' => [
                     'collection_parent_id' => 'Parent Association (id / name)',
                     'collection_name' => 'Name',
-                    'collection_description' => 'Description',
+                    // 'collection_description' => 'Description',
                 ],
             ],
             ResourceType::Brands->value => [

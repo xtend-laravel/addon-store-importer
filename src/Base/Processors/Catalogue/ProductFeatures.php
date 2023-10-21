@@ -5,6 +5,7 @@ namespace XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Lunar\FieldTypes\TranslatedText;
 use Xtend\Extensions\Lunar\Core\Models\ProductOption;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue\Concerns\InteractsWithProductModel;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Processor;
@@ -30,14 +31,28 @@ class ProductFeatures extends Processor
 
             $features->each(function (ProductFeature $feature) use ($product) {
                 $handle = $feature->handle;
-                $values = collect($product->get('features')[$handle]['values'] ?? []);
-                $values->each(function (array $value) use ($feature) {
-                    $featureValue = $feature->values()->updateOrCreate([
-                        'name->en' => $value['name']->getValue()->get('en')->getValue(),
-                    ], Arr::except($value, ['name']));
+                $values = $product->get('features')[$handle]['values'] ?? [];
 
-                    $this->featureValueIds[] = $featureValue->id;
-                });
+                if ($values instanceof TranslatedText) {
+                    $name = $values->getValue()->get('en')->getValue();
+                } else {
+                    $name = $values['name'] ?? null;
+                }
+
+                $featureValue = $feature->values()->updateOrCreate([
+                    'name->en' => $name,
+                ], ['name' => $values]);
+
+                $this->featureValueIds[] = $featureValue->id;
+
+                // $values->each(function (array $value) use ($feature) {
+                //     dd($value);
+                //     $featureValue = $feature->values()->updateOrCreate([
+                //         'name->en' => $value['name']->getValue()->get('en')->getValue(),
+                //     ], Arr::except($value, ['name']));
+                //
+                //     $this->featureValueIds[] = $featureValue->id;
+                // });
             });
 
             $this->getProductModel()->featureValues()->sync($this->featureValueIds);
