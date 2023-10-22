@@ -184,6 +184,10 @@ class ProductSync implements ShouldQueue
             ];
         }
 
+        if ($handle === 'size') {
+            [$value, $size] = explode(':', $value);
+        }
+
         return [
             'name' => is_string($value)
                 ? new TranslatedText([
@@ -192,6 +196,7 @@ class ProductSync implements ShouldQueue
                     'ar' => new Text($value),
                 ])
                 : $value['name'],
+            'stock' => (int)$size ?? 9999,
         ];
     }
 
@@ -248,7 +253,7 @@ class ProductSync implements ShouldQueue
                 Processors\Catalogue\ProductOptions::class,
                 Processors\Catalogue\ProductFeatures::class,
                 Processors\Catalogue\ProductVariants::class,
-                // Processors\Catalogue\ProductImages::class,
+                Processors\Catalogue\ProductImages::class,
             ],
         );
 

@@ -3,7 +3,6 @@
 namespace XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue;
 
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Lunar\Models\Language;
 use Lunar\Models\ProductType;
 use Xtend\Extensions\Lunar\Core\Models\Product as ProductModel;

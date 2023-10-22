@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Lunar\FieldTypes\Text;
 use Lunar\FieldTypes\TranslatedText;
+use Lunar\Models\ProductOptionValue;
 use Xtend\Extensions\Lunar\Core\Models\ProductOption;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue\Concerns\InteractsWithProductModel;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Processor;
@@ -20,12 +21,16 @@ class ProductOptions extends Processor
 
     protected Collection $optionValues;
 
+    protected Collection $product;
+
     public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
     {
+        $this->product = $product;
+
         $this->optionValues = collect();
         $this->setProductModel($product->get('productModel'));
 
-        $options = $this->prepareOptions($product);
+        $options = $this->prepareOptions();
 
         if ($options->isNotEmpty()) {
             $options->each(function (Collection $values, string $handle) use ($product) {
@@ -34,6 +39,7 @@ class ProductOptions extends Processor
             });
 
             $product->put('optionValues', $this->optionValues->pluck('id')->unique());
+            $this->product->put('options', $this->transformOptions());
         }
     }
 
@@ -59,21 +65,46 @@ class ProductOptions extends Processor
         $values->each(function (array $value) use ($option) {
             /** @var TranslatedText $name */
             $name = $value['name'];
+
             if ($name instanceof TranslatedText) {
                 $name = $name->getValue()->get('en')->getValue();
             }
 
             $optionValue = $option->values()->updateOrCreate([
                 'name->en' => $name,
-            ], $value);
+            ], ['name' => $value['name']]);
 
             $this->optionValues->push($optionValue);
         });
     }
 
-    protected function prepareOptions(Collection $product): Collection
+    protected function transformOptions(): Collection
     {
-        return collect($product->get('options'))
+        return collect($this->product->get('options'))->map(function (array $option) {
+            $images = collect($option['images'] ?? []);
+            return collect($option)
+                ->keys()
+                ->filter(fn ($key) => $option[$key] ?? false)
+                ->mapWithKeys(function ($key) use ($option) {
+                    return [
+                        $key => collect($option[$key])
+                            ->filter(fn ($value) => $value['name'] ?? null instanceof TranslatedText)
+                            ->mapWithKeys(function ($value) {
+                                $name = $value['name']->getValue()->get('en')->getValue();
+                                $key = ProductOptionValue::query()->firstWhere('name->en', $name)->id;
+                                return [$key => $value];
+                            }),
+                    ];
+                })
+                ->filter(fn (Collection $value) => $value->isNotEmpty())
+                ->merge(['images' => $images])
+                ->toArray();
+        });
+    }
+
+    protected function prepareOptions(): Collection
+    {
+        return collect($this->product->get('options'))
             ->reduce(function ($carry, $option) {
                 unset($option['images']);
                 foreach ($option as $key => $values) {

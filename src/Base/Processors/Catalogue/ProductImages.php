@@ -47,7 +47,8 @@ class ProductImages extends Processor
 
             $matchedOption = collect($product->get('options'))
                 ->first(function ($option) use ($colorOption) {
-                    $colorValue = $option['color'][0]['name']->getValue()->get('en')->getValue();
+                    $color = collect($option['color'])->first();
+                    $colorValue = $color['name']->getValue()->get('en')->getValue();
                     return $colorValue === $colorOption;
                 });
 

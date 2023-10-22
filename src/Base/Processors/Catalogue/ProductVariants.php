@@ -2,6 +2,7 @@
 
 namespace XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue;
 
+use FontLib\Table\Type\glyf;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -24,6 +25,10 @@ class ProductVariants extends Processor
 
     protected Currency $currency;
 
+    protected Collection $optionValues;
+
+    protected Collection $product;
+
     public function __construct()
     {
         $this->taxClass = TaxClass::getDefault();
@@ -35,6 +40,7 @@ class ProductVariants extends Processor
      */
     public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
     {
+        $this->product = $product;
         $this->setProductModel($product->get('productModel'));
 
         if (! ProductOption::count() && ! ProductOptionValue::count()) {
@@ -42,11 +48,11 @@ class ProductVariants extends Processor
         }
 
         $this->deleteVariants();
-        $this->createBaseVariant($product);
+        $this->createBaseVariant();
 
-        $optionValues = $product->get('optionValues');
+        $this->optionValues = $product->get('optionValues');
 
-        $this->generateVariants($optionValues);
+        $this->generateVariants();
 
         $productModel = $this->getProductModel();
         $productModel = $productModel->refresh();
@@ -67,17 +73,17 @@ class ProductVariants extends Processor
         Schema::enableForeignKeyConstraints();
     }
 
-    protected function createBaseVariant(Collection $product): void
+    protected function createBaseVariant(): void
     {
-        $prices = $product->get('prices');
+        $prices = $this->product->get('prices');
 
         /** @var ProductVariant $variantModel */
         $variantModel = ProductVariant::query()->create([
-            'sku' => $product->get('sku'),
+            'sku' => $this->product->get('sku'),
             'base' => true,
-            'weight_value' => $product->get('weight') ?? 0,
+            'weight_value' => $this->product->get('weight') ?? 0,
             'weight_unit' => 'lbs',
-            'stock' => $product->get('stock') ?? 99999,
+            'stock' => $this->product->get('stock') ?? 0,
             'product_id' => $this->getProductModel()->id,
             'tax_class_id' => $this->taxClass->id,
         ]);
@@ -93,17 +99,18 @@ class ProductVariants extends Processor
         ]);
     }
 
-    protected function generateVariants(Collection $optionValues): void
+    protected function generateVariants(): void
     {
-        $valueModels = ProductOptionValue::findMany($optionValues);
+        $valueModels = ProductOptionValue::findMany($this->optionValues);
+        //dd($valueModels, $optionValues->pluck('id')->unique());
 
-        if ($valueModels->count() != count($optionValues)) {
+        if ($valueModels->count() != $this->optionValues->count()) {
             throw new InvalidProductValuesException(
                 'One or more option values do not exist in the database'
             );
         }
 
-        $permutations = $this->getPermutations($optionValues);
+        $permutations = $this->getPermutations();
         $baseVariant = $this->getProductModel()->variants->first();
 
         foreach ($permutations as $key => $optionsToCreate) {
@@ -154,7 +161,7 @@ class ProductVariants extends Processor
             ]);
         });
 
-        $variant->stock = $baseVariant->stock ?? 0;
+        $variant->stock = $this->getStock($optionsToCreate, $baseVariant);
         $variant->product_id = $baseVariant->product_id;
         $variant->tax_class_id = $baseVariant->tax_class_id;
         $variant->attribute_data = $baseVariant->attribute_data;
@@ -164,15 +171,56 @@ class ProductVariants extends Processor
         $variant->prices()->createMany($pricing->toArray());
     }
 
+    protected function getStock(array $optionsToCreate, ProductVariant $baseVariant): int
+    {
+        // Stock has to be stored against one of the options, in this case it's size to use for stock lookup
+        $size = ProductOption::query()->firstWhere('handle', 'size');
+
+        // Get all option values and stock to be transformed into a lookup array
+        $optionValueIds = collect($this->product->get('options'));
+
+        // Number of options to match against for comparing diff which will be included in this variant minus 1 for images
+        $matchOptionsNb = collect($optionValueIds->first())->keys()->count() - 1;
+
+        $optionValueIds->transform(
+            fn($option) => collect($option)
+                ->map(fn ($values) => collect($values)->keys())
+                ->flatten()
+                ->mapWithKeys(function ($valueId) use ($option) {
+                    $stock = $option['size'][$valueId]['stock'] ?? null;
+                    return [$valueId => $stock];
+                })->toArray(),
+        )->toArray();
+
+        foreach ($optionValueIds as $optionValueIdArr) {
+            $ids = array_filter(array_keys($optionValueIdArr));
+            $diff = array_intersect($ids, $optionsToCreate);
+            $sizeKey = $optionsToCreate[$size->id] ?? null;
+            $stockLookup = $optionValueIdArr;
+
+            if ($stockLookup[$sizeKey] ?? false) {
+                if (count($diff) === $matchOptionsNb) {
+                    // dump('stockLookup', $stockLookup);
+                    // dump('stock', $stockLookup[$sizeKey]);
+                    // dump('size', $optionsToCreate[$size->id]);
+                    // dump('diff', $diff);
+                    return $stockLookup[$sizeKey] ?? 0;
+                }
+            }
+        }
+
+        return $baseVariant->stock;
+    }
+
     /**
      * Gets permutations array from the option values.
      *
      * @return array
      */
-    protected function getPermutations(Collection $optionValues)
+    protected function getPermutations()
     {
         return Arr::permutate(
-            ProductOptionValue::findMany($optionValues)
+            ProductOptionValue::findMany($this->optionValues)
                 ->groupBy('product_option_id')
                 ->mapWithKeys(function ($values) {
                     $optionId = $values->first()->product_option_id;
