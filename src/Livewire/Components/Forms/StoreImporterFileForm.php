@@ -97,6 +97,11 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
         // @todo Move all this logic to its own class
         $rows = $this->fileImporter->getRows();
         $this->syncProductRows($rows);
+
+        $this->notify(
+            message: __('Updated :name import', ['name' => $this->model->name]),
+            route: 'hub.store-importer',
+        );
     }
 
     protected function syncProductRows(Collection $rows): void

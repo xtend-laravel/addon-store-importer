@@ -5,7 +5,6 @@ namespace XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Lunar\FieldTypes\Text;
 use Lunar\FieldTypes\TranslatedText;
@@ -72,7 +71,7 @@ class ProductOptions extends Processor
 
             $optionValue = $option->values()->updateOrCreate([
                 'name->en' => $name,
-            ], ['name' => $value['name']]);
+            ], Arr::except($value, ['stock']));
 
             $this->optionValues->push($optionValue);
         });
