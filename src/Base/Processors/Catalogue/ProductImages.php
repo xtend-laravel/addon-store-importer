@@ -88,6 +88,8 @@ class ProductImages extends Processor
 
         $media->setCustomProperty('primary', $key === 0);
         $media->save();
+
+        $this->images->put($media->id, $image);
     }
 
     protected function imageExists(string $image): bool
