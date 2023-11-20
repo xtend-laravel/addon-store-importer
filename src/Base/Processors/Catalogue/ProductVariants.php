@@ -47,12 +47,7 @@ class ProductVariants extends Processor
             throw new \Exception('Product options and values must be imported before variants.');
         }
 
-        $this->deleteVariants();
-        $this->createBaseVariant();
-
-        $this->optionValues = $product->get('optionValues');
-
-        $this->generateVariants();
+        $this->updateOrCreateBaseVariant();
 
         $productModel = $this->getProductModel();
         $productModel = $productModel->refresh();
@@ -62,25 +57,20 @@ class ProductVariants extends Processor
         ProductVariant::query()->find($productModel->variant_default_id)->update([
             'base' => true,
         ]);
+
+        $this->optionValues = $product->get('optionValues');
+        $this->generateVariants();
     }
 
-    protected function deleteVariants(): void
-    {
-        // @todo Delete all variants and prices needs to be configurable
-        Schema::disableForeignKeyConstraints();
-        $this->getProductModel()->variants()->delete();
-        $this->getProductModel()->prices()->delete();
-        Schema::enableForeignKeyConstraints();
-    }
-
-    protected function createBaseVariant(): void
+    protected function updateOrCreateBaseVariant(): void
     {
         $prices = $this->product->get('prices');
 
         /** @var ProductVariant $variantModel */
-        $variantModel = ProductVariant::query()->create([
+        $variantModel = ProductVariant::query()->updateOrCreate([
             'sku' => $this->product->get('sku'),
             'base' => true,
+        ], [
             'weight_value' => $this->product->get('weight') ?? 0,
             'weight_unit' => 'lbs',
             'stock' => $this->product->get('stock') ?? 0,
@@ -99,10 +89,12 @@ class ProductVariants extends Processor
         ]);
     }
 
+    /**
+     * @throws \Lunar\Hub\Exceptions\InvalidProductValuesException
+     */
     protected function generateVariants(): void
     {
         $valueModels = ProductOptionValue::findMany($this->optionValues);
-        //dd($valueModels, $optionValues->pluck('id')->unique());
 
         if ($valueModels->count() != $this->optionValues->count()) {
             throw new InvalidProductValuesException(
@@ -112,21 +104,17 @@ class ProductVariants extends Processor
 
         $permutations = $this->getPermutations();
         $baseVariant = $this->getProductModel()->variants->first();
-
-        foreach ($permutations as $key => $optionsToCreate) {
-            $this->createVariant($baseVariant, $optionsToCreate, $key);
+        if (! $baseVariant) {
+            return;
         }
 
-        if ($baseVariant) {
-            $baseVariant->values()->detach();
-            $baseVariant->prices()->delete();
-            $baseVariant->delete();
+        foreach ($permutations as $key => $optionsToCreate) {
+            $this->createOrUpdateVariant($baseVariant, $optionsToCreate, $key);
         }
     }
 
-    protected function createVariant(ProductVariant $baseVariant, array $optionsToCreate, int $key): void
+    protected function createOrUpdateVariant(ProductVariant $baseVariant, array $optionsToCreate, int $key): void
     {
-        $variant = new ProductVariant();
         $rules = config('lunar-hub.products', []);
         $uoms = ['length', 'width', 'height', 'weight', 'volume'];
 
@@ -161,14 +149,24 @@ class ProductVariants extends Processor
             ]);
         });
 
-        $variant->stock = $this->getStock($optionsToCreate, $baseVariant);
-        $variant->product_id = $baseVariant->product_id;
-        $variant->tax_class_id = $baseVariant->tax_class_id;
-        $variant->attribute_data = $baseVariant->attribute_data;
-        $variant->fill($attributes);
-        $variant->save();
-        $variant->values()->attach($optionsToCreate);
+        /** @var ProductVariant $variant */
+        Schema::disableForeignKeyConstraints();
+        $variant = ProductVariant::query()->updateOrCreate([
+            'sku' => $attributes['sku'],
+            'base' => false,
+        ], [
+            'stock' => $this->getStock($optionsToCreate, $baseVariant),
+            'product_id' => $baseVariant->product_id,
+            'tax_class_id' => $baseVariant->tax_class_id,
+            'attribute_data' => $baseVariant->attribute_data,
+            ...Arr::except($attributes, ['sku']),
+        ]);
+
+        $variant->prices()->delete();
         $variant->prices()->createMany($pricing->toArray());
+        Schema::enableForeignKeyConstraints();
+
+        $variant->values()->sync($optionsToCreate);
     }
 
     protected function getStock(array $optionsToCreate, ProductVariant $baseVariant): int
