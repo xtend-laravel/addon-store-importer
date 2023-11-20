@@ -171,6 +171,15 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
                 if (Str::endsWith($key, $this->languageIsoCodes) && is_array($value)) {
                     $langIso = Str::afterLast($key, '_');
                     $fieldName = Str::of($key)->beforeLast('_'.$langIso)->value();
+
+                    if (!$value[0] && !str_starts_with($key, 'name')) {
+                        $defaultTranslation = $this->fieldTranslations[$rowKey][$fieldName]['en'] ?? null;
+                        if ($defaultTranslation) {
+                            $defaultTranslation .= ' ('.$langIso.')';
+                            $value[0] = $defaultTranslation;
+                        }
+                    }
+
                     $this->fieldTranslations[$rowKey][$fieldName][$langIso] ??= $value[0] ?? $value;
                     return [$fieldName => $this->fieldTranslations[$rowKey][$fieldName]];
                 }

@@ -8,9 +8,12 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Lunar\FieldTypes\Text;
 use Lunar\FieldTypes\TranslatedText;
+use Lunar\Models\Price;
+use Lunar\Models\ProductVariant;
 use XtendLunar\Addons\StoreImporter\Base\Processors;
 use XtendLunar\Addons\StoreImporter\Concerns\InteractsWithDebug;
 use XtendLunar\Addons\StoreImporter\Concerns\InteractsWithPipeline;
@@ -182,6 +185,10 @@ class ProductSync implements ShouldQueue
                 'secondary_color' => $value['colors'][1] ?? null,
                 'tertiary_color' => $value['colors'][2] ?? null,
             ];
+        }
+
+        if (!$value) {
+            $value = 'S:0,M:0,L:0,XL:0';
         }
 
         if ($handle === 'size') {
