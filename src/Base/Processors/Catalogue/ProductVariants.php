@@ -172,38 +172,27 @@ class ProductVariants extends Processor
     protected function getStock(array $optionsToCreate, ProductVariant $baseVariant): int
     {
         // Stock has to be stored against one of the options, in this case it's size to use for stock lookup
-        $size = ProductOption::query()->firstWhere('handle', 'size');
+        $sizeOption = ProductOption::query()->firstWhere('handle', 'size');
 
         // Get all option values and stock to be transformed into a lookup array
-        $optionValueIds = collect($this->product->get('options'));
-
-        // Number of options to match against for comparing diff which will be included in this variant minus 1 for images
-        $matchOptionsNb = collect($optionValueIds->first())->keys()->count() - 1;
-
-        $optionValueIds->transform(
+        $matchedStock = collect($this->product->get('options'))->map(
             fn($option) => collect($option)
-                ->map(fn ($values) => collect($values)->keys())
-                ->flatten()
+                ->filter(fn ($value, $valueId) => $valueId !== 'images')
+                ->flatMap(fn ($values) => collect($values)->keys())
                 ->mapWithKeys(function ($valueId) use ($option) {
-                    $stock = $option['size'][$valueId]['stock'] ?? null;
+                    $stock = $option['size'][$valueId]['stock'] ?? 'color';
                     return [$valueId => $stock];
-                })->toArray(),
-        )->toArray();
+                })
+                ->toArray(),
+        )
+            ->filter()
+            ->toArray();
 
-        foreach ($optionValueIds as $optionValueIdArr) {
-            $ids = array_filter(array_keys($optionValueIdArr));
-            $diff = array_intersect($ids, $optionsToCreate);
-            $sizeKey = $optionsToCreate[$size->id] ?? null;
-            $stockLookup = $optionValueIdArr;
-
-            if ($stockLookup[$sizeKey] ?? false) {
-                if (count($diff) === $matchOptionsNb) {
-                    // dump('stockLookup', $stockLookup);
-                    // dump('stock', $stockLookup[$sizeKey]);
-                    // dump('size', $optionsToCreate[$size->id]);
-                    // dump('diff', $diff);
-                    return $stockLookup[$sizeKey] ?? 0;
-                }
+        foreach ($matchedStock as $stockLookup) {
+            $matchingOptions = array_intersect($optionsToCreate, array_keys($stockLookup));
+            if (count($matchingOptions) === count($optionsToCreate)) {
+                $sizeKey = $optionsToCreate[$sizeOption->id] ?? null;
+                return $stockLookup[$sizeKey] ?? 0;
             }
         }
 
@@ -226,7 +215,8 @@ class ProductVariants extends Processor
                     return [$optionId => $values->map(function ($value) {
                         return $value->id;
                     })];
-                })->toArray()
+                })
+                ->toArray()
         );
     }
 }

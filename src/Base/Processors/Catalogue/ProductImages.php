@@ -40,10 +40,13 @@ class ProductImages extends Processor
 
     protected function variantImages(Collection $product): void
     {
-        $this->getProductModel()->variants->each(function (ProductVariant $variant) use ($product) {
+        $variants = $this->getProductModel()->variants()->where('base', false)->get();
+
+        $variants->each(function (ProductVariant $variant) use ($product) {
             $colorOption = $variant->values->first(
                 fn ($value) => $value->option->handle === 'color',
             )?->translate('name');
+
 
             $matchedOption = collect($product->get('options'))
                 ->first(function ($option) use ($colorOption) {
@@ -82,24 +85,27 @@ class ProductImages extends Processor
 			return;
 		}
 
+        $imageFilename = parse_url($image, PHP_URL_QUERY);
         $media = $this->getProductModel()
             ->addMediaFromUrl($image)
+            ->setFileName($imageFilename)
             ->toMediaCollection('images');
 
         $media->setCustomProperty('primary', $key === 0);
         $media->save();
 
-        $this->images->put($media->id, $image);
+        if ($media->id) {
+            $this->images->put($media->id, $image);
+        }
     }
 
     protected function imageExists(string $image): bool
     {
-        // @todo Allow to replace image on force update?
-        $imageFilename = basename(parse_url($image, PHP_URL_PATH));
+        $imageFilename = parse_url($image, PHP_URL_QUERY);
 
         $mediaCollection = $this->getProductModel()->getMedia('images')->mapWithKeys(
             fn (Media $media) => [
-                $media->id => Str::of($media->file_name)->beforeLast('.')->value(),
+                $media->id => Str::of($media->file_name)->value(),
             ],
         );
 
@@ -107,7 +113,10 @@ class ProductImages extends Processor
             fn ($filename) => $filename === $imageFilename,
         )->keys()->first();
 
-        $this->images->put($matchedMediaId, $image);
+        if ($matchedMediaId) {
+            $this->images->put($matchedMediaId, $image);
+        }
+
         return !!$matchedMediaId;
     }
 }

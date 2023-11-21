@@ -8,12 +8,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Lunar\FieldTypes\Text;
 use Lunar\FieldTypes\TranslatedText;
-use Lunar\Models\Price;
-use Lunar\Models\ProductVariant;
 use XtendLunar\Addons\StoreImporter\Base\Processors;
 use XtendLunar\Addons\StoreImporter\Concerns\InteractsWithDebug;
 use XtendLunar\Addons\StoreImporter\Concerns\InteractsWithPipeline;
@@ -143,7 +140,13 @@ class ProductSync implements ShouldQueue
                         )
                         ->merge([
                             'images' => collect($variant['product_images'])
-                                ->flatMap(fn (string $image) => Str::of($image)->matchAll('/\((https?:\/\/[^)]+)\)/'))
+                                ->map(
+                                    function (string $image) {
+                                        $originalImage = Str::of($image)->before('(')->trim()->value();
+                                        $tempImage = Str::of($image)->betweenFirst('(', ')')->trim()->value();
+                                        return $tempImage.'?'.$originalImage;
+                                    },
+                                )
                                 ->toArray(),
                         ])
                         ->filter()
@@ -237,10 +240,16 @@ class ProductSync implements ShouldQueue
 
     protected function prepareProductImages(): void
     {
-        // @todo Move this to a transformer class MarkdownImagesTransformer
         $images = collect($this->productRow['product_images'])
             ->flatMap(fn (array $images, $key) => [
-                $key => collect($images)->flatMap(fn (string $image) => Str::of($image)->matchAll('/\((https?:\/\/[^)]+)\)/')),
+                $key => collect($images)
+                    ->map(
+                        function (string $image) {
+                            $originalImage = Str::of($image)->before('(')->trim()->value();
+                            $tempImage = Str::of($image)->betweenFirst('(', ')')->trim()->value();
+                            return $tempImage.'?'.$originalImage;
+                        },
+                    )
             ])
             ->toArray();
 
