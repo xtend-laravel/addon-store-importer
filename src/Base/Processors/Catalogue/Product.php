@@ -28,12 +28,12 @@ class Product extends Processor
         $productModel->urls()->delete();
         $productName = $product->get('attribute_data')['name']->getValue();
 
-        $productName->each(function ($value, $isoCode) use ($productModel) {
+        $productName->each(function ($value, $isoCode) use ($productModel, $product) {
             $languageId = Language::query()->firstWhere('code', $isoCode)->id;
             $productModel->urls()->create([
                 'default' => $languageId === Language::getDefault()->id,
                 'language_id' => $languageId,
-                'slug' => $productModel->id.'-'.$this->slug($value),
+                'slug' => $this->slug($value).'-'.$product->get('sku'),
             ]);
         });
 

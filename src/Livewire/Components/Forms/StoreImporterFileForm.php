@@ -110,7 +110,6 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
         $productResource = $this->model->resources()->where('type', ResourceType::Products)->sole();
 
         $rows
-            //->filter(fn (array $rowProperties) => $rowProperties['Base SKU'] === 'AWR-GMTF-006')
             ->filter(fn (array $rowProperties) => $rowProperties['Primary'] === 'checked')
             ->each(function(array $rowProperties) use ($productResource, $rows) {
                 $productRow = $this->getProductRow($productResource, $rowProperties);
@@ -128,8 +127,9 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
                 $productRow['variants'] = $variants->toArray();
                 $productRow['product_images'] = $images;
 
-                ProductSync::dispatch($productResource, $productRow);
-                // ProductSync::dispatchSync($productResource, $productRow);
+                dd($productRow);
+                // ProductSync::dispatch($productResource, $productRow);
+                ProductSync::dispatchSync($productResource, $productRow);
             });
     }
 
@@ -219,18 +219,14 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
 
     public function handleFileUploaded($name, array $filenames = []): void
     {
-        $this->model->key = $filenames[0];
-        $this->file = TemporaryUploadedFile::createFromLivewire($this->model->key);
+        $this->file = TemporaryUploadedFile::createFromLivewire($filenames[0]);
         $this->model->name = $this->file->getClientOriginalName();
+        $this->model->key = 'imports/'.$this->model->name;
 
-        $this->setFileImporterHeaders();
-
-        if ($this->model->exists) {
-            // @todo if the file is replaced then create new file importer
-        }
+        $this->setFileImporterHeaders(onUpload: true);
     }
 
-    protected function setFileImporterHeaders(): void
+    protected function setFileImporterHeaders(bool $onUpload = false): void
     {
         $this->languageIsoCodes = Language::all()->pluck('code')->toArray();
 
@@ -251,6 +247,12 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
 
         $this->fields = $this->headers;
         $this->fileImporter->close();
+
+        if ($this->model->exists && $onUpload) {
+            $this->model->update([
+                'headers' => $this->headers,
+            ]);
+        }
     }
 
     protected function getMappedValue($key): ?string
