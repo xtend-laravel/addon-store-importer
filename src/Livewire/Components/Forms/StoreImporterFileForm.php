@@ -127,9 +127,8 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
                 $productRow['variants'] = $variants->toArray();
                 $productRow['product_images'] = $images;
 
-                dd($productRow);
-                // ProductSync::dispatch($productResource, $productRow);
-                ProductSync::dispatchSync($productResource, $productRow);
+                ProductSync::dispatch($productResource, $productRow);
+                // ProductSync::dispatchSync($productResource, $productRow);
             });
     }
 
