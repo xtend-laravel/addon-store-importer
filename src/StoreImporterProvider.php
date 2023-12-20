@@ -2,17 +2,19 @@
 
 namespace XtendLunar\Addons\StoreImporter;
 
+use Binaryk\LaravelRestify\Traits\InteractsWithRestifyRepositories;
 use CodeLabX\XtendLaravel\Base\XtendAddonProvider;
 use Database\Seeders\DatabaseSeeder;
-use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Events\LocaleUpdated;
-use Illuminate\Http\File;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
-use Livewire\TemporaryUploadedFile;
 use Lunar\Hub\Facades\Menu;
 use StoreImporter\Database\Seeders\StoreImporterSeeder;
+use XtendLunar\Addons\StoreImporter\Base\AirtableInterface;
+use XtendLunar\Addons\StoreImporter\Base\AirtableManager;
+use XtendLunar\Addons\StoreImporter\Livewire\Products\Table;
 use XtendLunar\Addons\StoreImporter\Enums\FileType;
 use XtendLunar\Addons\StoreImporter\Livewire\Components\Forms\StoreImporterFileForm;
 use XtendLunar\Addons\StoreImporter\Livewire\Components\StoreImporterFilesTable;
@@ -23,6 +25,12 @@ use XtendLunar\Addons\StoreImporter\Support\Import\JsonImport;
 
 class StoreImporterProvider extends XtendAddonProvider
 {
+    use InteractsWithRestifyRepositories;
+
+    protected $policies = [
+
+    ];
+
     public function register()
     {
 	    $this->loadRoutesFrom(__DIR__.'/../routes/hub.php');
@@ -52,17 +60,44 @@ class StoreImporterProvider extends XtendAddonProvider
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
-               // @todo Add commands to sync inventory, orders, etc.
+
             ]);
         }
 
-        // @todo not sure why we need to register this here
-	    Livewire::component('hub.pages.store-importer', StoreImporter::class);
+        if ($this->app->environment('production')) {
+            $this->app->afterResolving(Schedule::class, function (Schedule $schedule) {
+                // $schedule->command(SyncProducts::class)->dailyAt('00:00');
+                // $schedule->command(DeleteProductsNotInChannel::class)->dailyAt('00:00');
+            });
+        }
 
+        $this->registerPolicies();
+	    $this->registerWithSidebarMenu();
+
+        $this->publishes([
+           __DIR__.'/../config/store-importer.php' => config_path('store-importer.php'),
+        ]);
+
+        $this->app->singleton(AirtableInterface::class, function ($app) {
+            return $app->make(AirtableManager::class);
+        });
+
+        $this->registerLivewireComponents();
+    }
+
+    protected function registerLivewireComponents(): void
+    {
+        Livewire::component('hub.pages.store-importer', StoreImporter::class);
 	    Livewire::component('hub.components.store-importer-files.table', StoreImporterFilesTable::class);
         Livewire::component('hub.components.forms.store-importer-file-form', StoreImporterFileForm::class);
+        Livewire::component('hub.components.store-importer.products.table', Table::class);
+    }
 
-	    $this->registerWithSidebarMenu();
+    protected function registerPolicies()
+    {
+        foreach ($this->policies as $model => $policy) {
+            Gate::policy($model, $policy);
+        }
     }
 
 	protected function registerSeeders(array $seeders = []): void
@@ -82,6 +117,12 @@ class StoreImporterProvider extends XtendAddonProvider
 			    ->section('hub.store-importer')
 			    ->name('Store Importer')
 			    ->route('hub.store-importer')
+			    ->icon('database');
+            Menu::slot('sidebar')
+			    ->group('hub.configure')
+			    ->section('hub.store-airtable-sync')
+			    ->name('Airtable Sync')
+			    ->route('hub.store-airtable-sync')
 			    ->icon('database');
 		});
 	}

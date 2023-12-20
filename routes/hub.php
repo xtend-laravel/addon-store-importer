@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Lunar\Hub\Http\Middleware\Authenticate;
+use XtendLunar\Addons\StoreImporter\Livewire\Pages\AirtableIndex;
 use XtendLunar\Addons\StoreImporter\Livewire\Pages\StoreImporter;
 
 /**
@@ -12,5 +13,5 @@ Route::group([
     'middleware' => ['web', Authenticate::class, 'can:settings:core'],
 ], function () {
     Route::get('/store-importer', StoreImporter::class)->name('hub.store-importer');
-    //Route::get('/store-importer/{importer}', StoreImporter::class)->name('hub.store-importer.show');
+    Route::get('/store-airtable-sync', AirtableIndex::class)->name('hub.store-airtable-sync');
 });

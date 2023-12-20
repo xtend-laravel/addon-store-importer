@@ -6,6 +6,7 @@ use FontLib\Table\Type\glyf;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
+use Lunar\FieldTypes\Text;
 use Lunar\Hub\Exceptions\InvalidProductValuesException;
 use Lunar\Models\Currency;
 use Lunar\Models\Price;
@@ -151,14 +152,21 @@ class ProductVariants extends Processor
 
         /** @var ProductVariant $variant */
         Schema::disableForeignKeyConstraints();
+
+        $stock = $this->getStock($optionsToCreate, $baseVariant);
+
+        $attributeData = array_merge($baseVariant->attribute_data ?? [], [
+            'availability' => new Text($stock > 0 ? 'in-stock' : 'pre-order'),
+        ]);
+
         $variant = ProductVariant::query()->updateOrCreate([
             'sku' => $attributes['sku'],
             'base' => false,
         ], [
-            'stock' => $this->getStock($optionsToCreate, $baseVariant),
+            'stock' => $stock,
             'product_id' => $baseVariant->product_id,
             'tax_class_id' => $baseVariant->tax_class_id,
-            'attribute_data' => $baseVariant->attribute_data,
+            'attribute_data' => $attributeData,
             ...Arr::except($attributes, ['sku']),
         ]);
 
