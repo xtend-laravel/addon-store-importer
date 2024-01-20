@@ -145,6 +145,11 @@ class ProductSync implements ShouldQueue
                                         $originalImage = Str::of($image)->before('(')->trim()->value();
                                         $tempImage = Str::of($image)->betweenFirst('(', ')')->trim()->value();
                                         return $tempImage.'?'.$originalImage;
+
+                                        // $imageArr = explode('.png', $image);
+                                        // $originalImage = $imageArr[0].'.png';
+                                        // $tempImage = Str::of($imageArr[1])->betweenFirst('(', ')')->trim()->value();
+                                        // return $tempImage.'?'.$originalImage;
                                     },
                                 )
                                 ->toArray(),
@@ -248,6 +253,11 @@ class ProductSync implements ShouldQueue
                             $originalImage = Str::of($image)->before('(')->trim()->value();
                             $tempImage = Str::of($image)->betweenFirst('(', ')')->trim()->value();
                             return $tempImage.'?'.$originalImage;
+
+                            // $imageArr = explode('.png', $image);
+                            // $originalImage = $imageArr[0].'.png';
+                            // $tempImage = Str::of($imageArr[1])->betweenFirst('(', ')')->trim()->value();
+                            // return $tempImage.'?'.$originalImage;
                         },
                     )
             ])

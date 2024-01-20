@@ -112,6 +112,7 @@ class StoreImporterFileForm extends FormBuilder\Base\LunarForm
         $rows
             ->filter(fn (array $rowProperties) => $rowProperties['Import Only'] === 'checked')
             ->filter(fn (array $rowProperties) => $rowProperties['Primary'] === 'checked')
+            ->filter(fn (array $rowProperties) => $rowProperties['Base SKU'] === 'AWR-JNM-043')
             ->each(function(array $rowProperties) use ($productResource, $rows) {
                 $productRow = $this->getProductRow($productResource, $rowProperties);
 

@@ -25,13 +25,11 @@ class AirtableApiService
             request: $request,
         );
 
-        dd($response->json());
-
         if ($response->failed()) {
             dump($response->json('error.message'));
             return [];
         }
 
-        return $response->json('resources') ?? [];
+        return $response->json('resources') ?? $response->json('records') ?? [];
     }
 }
