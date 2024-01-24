@@ -14,6 +14,7 @@ use Lunar\Hub\Facades\Menu;
 use StoreImporter\Database\Seeders\StoreImporterSeeder;
 use XtendLunar\Addons\StoreImporter\Base\AirtableInterface;
 use XtendLunar\Addons\StoreImporter\Base\AirtableManager;
+use XtendLunar\Addons\StoreImporter\Commands\InventoryUpdateSync;
 use XtendLunar\Addons\StoreImporter\Commands\SyncProductSeasons;
 use XtendLunar\Addons\StoreImporter\Livewire\Products\Table;
 use XtendLunar\Addons\StoreImporter\Enums\FileType;
@@ -61,6 +62,7 @@ class StoreImporterProvider extends XtendAddonProvider
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
+                InventoryUpdateSync::class,
                 SyncProductSeasons::class,
             ]);
         }
