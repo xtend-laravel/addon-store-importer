@@ -4,17 +4,11 @@ namespace XtendLunar\Addons\StoreImporter\Airtable\Requests\Products;
 
 use Saloon\Enums\Method;
 use Saloon\Http\Request;
+use Saloon\PaginationPlugin\Contracts\Paginatable;
 
-class ListRecords extends Request
+class ListRecords extends Request implements Paginatable
 {
     protected Method $method = Method::GET;
-
-    protected function defaultQuery(): array
-    {
-        return [
-            'maxRecords' => 1000,
-        ];
-    }
 
     public function resolveEndpoint(): string
     {
