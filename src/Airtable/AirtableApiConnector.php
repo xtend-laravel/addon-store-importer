@@ -5,9 +5,9 @@ namespace XtendLunar\Addons\StoreImporter\Airtable;
 use Saloon\Http\Auth\TokenAuthenticator;
 use Saloon\Http\Connector;
 use Saloon\Http\Request;
-use Saloon\Http\Response;
 use Saloon\PaginationPlugin\Contracts\HasPagination;
-use Saloon\PaginationPlugin\OffsetPaginator;
+use Saloon\PaginationPlugin\CursorPaginator;
+use XtendLunar\Addons\StoreImporter\Airtable\Requests\AirtableCustomOffsetPaginator;
 
 class AirtableApiConnector extends Connector implements HasPagination
 {
@@ -23,21 +23,11 @@ class AirtableApiConnector extends Connector implements HasPagination
         );
     }
 
-    public function paginate(Request $request): OffsetPaginator
+    public function paginate(Request $request): CursorPaginator
     {
-        return new class(connector: $this, request: $request) extends OffsetPaginator
-        {
-            protected ?int $perPageLimit = 100;
-
-            protected function isLastPage(Response $response): bool
-            {
-                return $this->getOffset() >= (int)$response->json('total');
-            }
-
-            protected function getPageItems(Response $response, Request $request): array
-            {
-                return $response->json('items');
-            }
-        };
+        return new AirtableCustomOffsetPaginator(
+            connector: $this,
+            request: $request,
+        );
     }
 }

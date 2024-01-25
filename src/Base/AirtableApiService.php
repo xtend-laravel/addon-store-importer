@@ -21,15 +21,12 @@ class AirtableApiService
 
     private function processRequest(Request $request): array
     {
-        $response = $this->connector->send(
+        $paginator = $this->connector->paginate(
             request: $request,
         );
 
-        if ($response->failed()) {
-            dump($response->json('error.message'));
-            return [];
-        }
+        $collection = $paginator->collect();
 
-        return $response->json('resources') ?? $response->json('records') ?? [];
+        return $collection->all() ?? [];
     }
 }
