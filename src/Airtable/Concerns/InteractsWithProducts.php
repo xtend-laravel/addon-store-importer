@@ -62,6 +62,14 @@ trait InteractsWithProducts
         return $this;
     }
 
+    protected function productVariants(array $product): Collection
+    {
+        return collect(Airtable::products())
+            ->filter(fn($item) => $item['fields']['Import Only'] ?? false)
+            ->filter(fn($item) => $item['fields']['Base SKU'] === $product['product_sku'])
+            ->values();
+    }
+
     protected function get(): Collection
     {
         return $this->products;

@@ -34,8 +34,18 @@ class InventoryUpdateSync extends AirtableBaseCommand
         $productsMap = $this->products()
             ->importOnly()
             ->mapToSku()
-            ->get();
+            ->get()
+            ->map(function ($product) {
+                $product = $this->transformProduct($product);
+                $product['variants'] = $this->productVariants($product)
+                    ->transform(
+                        fn($productVariant) => collect($this->transformVariant($productVariant))
+                            ->only(['color', 'size', 'images']),
+                    );
+                return $product;
+            });
 
+        dd($productsMap);
         $productsMap->each(
             fn ($product, $sku) => $this->existsInStore($sku)
                 ? $this->updateProduct($sku, $product)
@@ -47,9 +57,7 @@ class InventoryUpdateSync extends AirtableBaseCommand
 
     protected function updateProduct(string $sku, array $product): void
     {
-        $this->transform($product);
-        exit;
-        //dd($product);
+        dd($product);
     }
 
     protected function createProduct(string $sku, array $product)

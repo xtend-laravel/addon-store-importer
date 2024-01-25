@@ -12,17 +12,31 @@ trait InteractWithTransformer
 {
     use InteractsWithPipeline;
 
-    protected function transform(array $product): void
+    protected function transformProduct(array $product): mixed
     {
-        $this->prepareThroughPipeline(
+        return $this->prepareThroughPipeline(
             passable: [
                 'product' => $product,
             ],
             pipes: [
-                Transformers\FieldMapTransformer::class,
-                Transformers\AttributeDataTransformer::class,
-                Transformers\FeaturesTransformer::class,
-                Transformers\ImagesTransformer::class,
+                Transformers\Product\FieldMapTransformer::class,
+                Transformers\Product\AttributeDataTransformer::class,
+                Transformers\Product\FeaturesTransformer::class,
+                Transformers\Product\ImagesTransformer::class,
+            ],
+        );
+    }
+
+    protected function transformVariant(array $productVariant): mixed
+    {
+        $productVariant = $this->transformProduct($productVariant['fields']);
+
+        return $this->prepareThroughPipeline(
+            passable: $productVariant,
+            pipes: [
+                Transformers\Variant\ColorTransformer::class,
+                Transformers\Variant\SizeStockTransformer::class,
+                Transformers\Variant\ImagesTransformer::class,
             ],
         );
     }

@@ -1,10 +1,11 @@
 <?php
 
-namespace XtendLunar\Addons\StoreImporter\Base\Transformers;
+namespace XtendLunar\Addons\StoreImporter\Base\Transformers\Product;
 
 use Illuminate\Support\Str;
 use Lunar\FieldTypes\Text;
 use Lunar\FieldTypes\TranslatedText;
+use XtendLunar\Addons\StoreImporter\Base\Transformers\Transformer;
 
 class FeaturesTransformer extends Transformer
 {

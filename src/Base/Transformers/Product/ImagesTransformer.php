@@ -1,6 +1,8 @@
 <?php
 
-namespace XtendLunar\Addons\StoreImporter\Base\Transformers;
+namespace XtendLunar\Addons\StoreImporter\Base\Transformers\Product;
+
+use XtendLunar\Addons\StoreImporter\Base\Transformers\Transformer;
 
 class ImagesTransformer extends Transformer
 {
