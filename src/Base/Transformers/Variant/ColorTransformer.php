@@ -16,7 +16,7 @@ class ColorTransformer extends Transformer
         }
 
         if (!isset($productOptions['primary_color'])) {
-            throw new \Exception('No primary color found for product variant.');
+            throw new \Exception('No primary color found for product variant .'.$productVariant['product_sku']);
         }
 
         $productVariant['color'] = [

@@ -21,7 +21,10 @@ class SizeStockTransformer extends Transformer
         );
 
         if ($productOptions['size'] ?? false) {
-            $inStockSizes = Str::of($productOptions['size'])->explode(',')->mapWithKeys(
+            if (is_string($productOptions['size'])) {
+                $productOptions['size'] = [$productOptions['size']];
+            }
+            $inStockSizes = collect($productOptions['size'])->mapWithKeys(
                 function ($value) {
                     [$size, $stock] = explode(':', $value);
                     return [$size => (int)$stock];
@@ -32,7 +35,7 @@ class SizeStockTransformer extends Transformer
         }
 
         $productVariant['size'] = collect($sizes)->map(
-            fn($size, $stock) => [
+            fn($stock, $size) => [
                 'name' => new TranslatedText([
                     'en' => new Text($size),
                     'fr' => new Text($size),
@@ -50,7 +53,7 @@ class SizeStockTransformer extends Transformer
         $collection = $productVariant['product_collections']['collections'][0] ?? null;
 
         if (!$collection) {
-            throw new \Exception('No collection found for product variant.');
+            throw new \Exception('No collection found for product variant.' . $productVariant['product_sku']);
         }
 
         return match($collection) {
