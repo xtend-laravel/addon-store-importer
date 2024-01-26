@@ -21,7 +21,7 @@ trait InteractWithProcessor
                 Processors\Catalogue\ProductOptions::class,
                 Processors\Catalogue\ProductFeatures::class,
                 Processors\Catalogue\ProductVariants::class,
-                // Processors\Catalogue\ProductImages::class,
+                Processors\Catalogue\ProductImages::class,
             ],
         );
     }

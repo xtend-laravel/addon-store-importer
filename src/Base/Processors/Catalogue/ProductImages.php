@@ -23,17 +23,16 @@ class ProductImages extends Processor
         $this->images = collect();
         $this->setProductModel($product->get('productModel'));
 
-        $images = collect($product->get('images'));
+        $images = collect($product->get('product_images') ?? $product->get('images') ?? []);
         if ($images->isEmpty()) {
             return;
         }
 
         $images->collapse()->each(
-            fn ($image, $key) => $this->saveImage($image, $key),
+            fn ($image, $fileKey) => $this->saveImage($image, $fileKey),
         );
 
         if ($this->images->isNotEmpty()) {
-            // @todo Create separate job for variant images
             $this->variantImages($product);
         }
     }
@@ -47,7 +46,6 @@ class ProductImages extends Processor
                 fn ($value) => $value->option->handle === 'color',
             )?->translate('name');
 
-
             $matchedOption = collect($product->get('options'))
                 ->first(function ($option) use ($colorOption) {
                     $color = collect($option['color'])->first();
@@ -60,9 +58,10 @@ class ProductImages extends Processor
             }
 
             $imageIds = $this->images
-                ->filter(fn ($image, $imageId) => in_array($image, $matchedOption['images']))
+                ->filter(fn ($fileKey, $imageId) => collect($matchedOption['images'])->keys()->contains($fileKey))
                 ->keys();
 
+            $imagesToSync = [];
             foreach ($imageIds as $key => $imageId) {
                 $imagesToSync[$imageId] = [
                     'primary' => $key === 0,
@@ -74,9 +73,9 @@ class ProductImages extends Processor
         });
     }
 
-    protected function saveImage(string $image, int $key): void
+    protected function saveImage(string $image, string $fileKey): void
     {
-        if ($this->imageExists($image)) {
+        if ($this->imageExists($fileKey)) {
             return;
         }
 
@@ -85,24 +84,21 @@ class ProductImages extends Processor
 			return;
 		}
 
-        $imageFilename = parse_url($image, PHP_URL_QUERY);
         $media = $this->getProductModel()
             ->addMediaFromUrl($image)
-            ->setFileName($imageFilename)
+            ->setFileName($fileKey)
             ->toMediaCollection('images');
 
-        $media->setCustomProperty('primary', $key === 0);
+        $media->setCustomProperty('primary', $this->images->isEmpty());
         $media->save();
 
         if ($media->id) {
-            $this->images->put($media->id, $image);
+            $this->images->put($media->id, $fileKey);
         }
     }
 
-    protected function imageExists(string $image): bool
+    protected function imageExists(string $fileKey): bool
     {
-        $imageFilename = parse_url($image, PHP_URL_QUERY);
-
         $mediaCollection = $this->getProductModel()->getMedia('images')->mapWithKeys(
             fn (Media $media) => [
                 $media->id => Str::of($media->file_name)->value(),
@@ -110,11 +106,11 @@ class ProductImages extends Processor
         );
 
         $matchedMediaId = $mediaCollection->filter(
-            fn ($filename) => $filename === $imageFilename,
+            fn ($filename) => $filename === $fileKey,
         )->keys()->first();
 
         if ($matchedMediaId) {
-            $this->images->put($matchedMediaId, $image);
+            $this->images->put($matchedMediaId, $fileKey);
         }
 
         return !!$matchedMediaId;

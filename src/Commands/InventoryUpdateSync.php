@@ -46,6 +46,7 @@ class InventoryUpdateSync extends AirtableBaseCommand
                             ->only(['color', 'size', 'images'])
                             ->toArray(),
                     );
+                $product['product_images'] = $product['variants']->pluck('images')->toArray();
                 return $product;
             });
 

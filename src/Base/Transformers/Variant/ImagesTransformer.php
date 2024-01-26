@@ -8,7 +8,8 @@ class ImagesTransformer extends Transformer
 {
     public function transform(array $productVariant): array
     {
-        $productVariant['images'] = collect($productVariant['product_images']);
+        $productVariant['images'] = collect($productVariant['product_images'])
+            ->pluck('url', 'filename');
 
         return $productVariant;
     }

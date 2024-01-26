@@ -20,7 +20,6 @@ trait InteractWithTransformer
                 Transformers\Product\AttributeDataTransformer::class,
                 Transformers\Product\PriceTransformer::class,
                 Transformers\Product\FeaturesTransformer::class,
-                Transformers\Product\ImagesTransformer::class,
             ],
         );
     }
