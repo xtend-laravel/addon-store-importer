@@ -33,7 +33,7 @@ class Product extends Processor
             $productModel->urls()->create([
                 'default' => $languageId === Language::getDefault()->id,
                 'language_id' => $languageId,
-                'slug' => $this->slug($value).'-'.$product->get('product_sku') ?? $product->get('sku'),
+                'slug' => strtolower($this->slug($value).'-'.$product->get('product_sku') ?? $product->get('sku')),
             ]);
         });
 
