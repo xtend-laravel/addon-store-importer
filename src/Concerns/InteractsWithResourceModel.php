@@ -9,7 +9,7 @@ use XtendLunar\Addons\StoreImporter\Models\StoreImporterResourceModel;
 
 trait InteractsWithResourceModel
 {
-    protected StoreImporterResourceModel $resourceModel;
+    protected ?StoreImporterResourceModel $resourceModel;
 
     /**
      * @throws \Exception

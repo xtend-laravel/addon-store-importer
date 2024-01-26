@@ -15,7 +15,7 @@ abstract class Processor
 
     public function handle(mixed $passable, \Closure $next): mixed
     {
-        $this->resourceModel = $passable['resourceModel'];
+        $this->resourceModel = $passable['resourceModel'] ?? null;
 
         $processKey = Str::snake(class_basename($this), '-');
         $this->benchmark([

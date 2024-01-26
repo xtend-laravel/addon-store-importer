@@ -22,7 +22,7 @@ class ProductOptions extends Processor
 
     protected Collection $product;
 
-    public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
+    public function process(Collection $product, ?StoreImporterResourceModel $resourceModel = null): void
     {
         $this->product = $product;
 
@@ -79,7 +79,7 @@ class ProductOptions extends Processor
 
     protected function transformOptions(): Collection
     {
-        return collect($this->product->get('options'))->map(function (array $option) {
+        return collect($this->product->get('variants') ?? $this->product->get('options') ?? [])->map(function (array $option) {
             $images = collect($option['images'] ?? []);
             return collect($option)
                 ->keys()
@@ -103,7 +103,7 @@ class ProductOptions extends Processor
 
     protected function prepareOptions(): Collection
     {
-        return collect($this->product->get('options'))
+        return collect($this->product->get('variants') ?? $this->product->get('options') ?? [])
             ->reduce(function ($carry, $option) {
                 unset($option['images']);
                 foreach ($option as $key => $values) {

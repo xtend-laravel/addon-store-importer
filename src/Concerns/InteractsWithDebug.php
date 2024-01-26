@@ -34,9 +34,9 @@ trait InteractsWithDebug
 
     protected function log(): Closure|array
     {
-        $this->resourceModel->update([
-            'debug' => array_merge($this->resourceModel->debug ?? [], $this->result),
-        ]);
+        // $this->resourceModel->update([
+        //     'debug' => array_merge($this->resourceModel->debug ?? [], $this->result),
+        // ]);
 
         return $this->benchmarkables;
     }

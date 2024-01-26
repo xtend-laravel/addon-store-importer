@@ -14,6 +14,10 @@ class FeaturesTransformer extends Transformer
         $product['product_feature'] = collect($product['product_feature'])
             ->mapWithKeys(
                 function ($value, $key) {
+                    $value = ! is_array($value) ? [$value] : $value;
+                    if (is_numeric(key($value))) {
+                        $value = ['en' => $value];
+                    }
                     return [
                         $key => [
                             'name' => new TranslatedText([

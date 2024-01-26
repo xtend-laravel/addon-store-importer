@@ -14,15 +14,15 @@ class Product extends Processor
 {
     use InteractsWithProductModel;
 
-    public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
+    public function process(Collection $product, ?StoreImporterResourceModel $resourceModel = null): void
     {
         /** @var ProductModel $productModel */
         $productModel = ProductModel::updateOrCreate([
-            'sku' => $product->get('sku'),
+            'sku' => $product->get('product_sku') ?? $product->get('sku'),
         ], [
             'attribute_data' => $product->get('attribute_data'),
             'product_type_id' => $this->getDefaultProductTypeId(),
-            'status' => $product->get('status') ?? 'draft',
+            'status' => 'published',
         ]);
 
         $productModel->urls()->delete();
@@ -33,17 +33,19 @@ class Product extends Processor
             $productModel->urls()->create([
                 'default' => $languageId === Language::getDefault()->id,
                 'language_id' => $languageId,
-                'slug' => $this->slug($value).'-'.$product->get('sku'),
+                'slug' => $this->slug($value).'-'.$product->get('product_sku') ?? $product->get('sku'),
             ]);
         });
 
         $this->setProductModel($productModel);
         $product->put('productModel', $this->getProductModel());
 
-        $resourceModel->model_type = $this->getProductModel()->getMorphClass();
-        $resourceModel->model_id = $this->getProductModel()->getKey();
-        $resourceModel->status = 'processing';
-        $resourceModel->save();
+        if ($resourceModel) {
+            $resourceModel->model_type = $this->getProductModel()->getMorphClass();
+            $resourceModel->model_id = $this->getProductModel()->getKey();
+            $resourceModel->status = 'processing';
+            $resourceModel->save();
+        }
     }
 
     protected function getDefaultProductTypeId(): int

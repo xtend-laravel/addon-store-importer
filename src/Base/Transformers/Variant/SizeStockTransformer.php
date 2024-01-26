@@ -43,7 +43,7 @@ class SizeStockTransformer extends Transformer
                 ]),
                 'stock' => $stock,
             ],
-        );
+        )->toArray();
 
         return $productVariant;
     }

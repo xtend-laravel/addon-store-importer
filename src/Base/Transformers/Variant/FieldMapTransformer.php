@@ -1,6 +1,6 @@
 <?php
 
-namespace XtendLunar\Addons\StoreImporter\Base\Transformers\Product;
+namespace XtendLunar\Addons\StoreImporter\Base\Transformers\Variant;
 
 use Illuminate\Support\Str;
 use XtendLunar\Addons\StoreImporter\Base\Transformers\Transformer;
@@ -18,8 +18,6 @@ class FieldMapTransformer extends Transformer
         'style' => 'product_collections',
         'design' => 'product_feature',
         'fabric' => 'product_feature',
-        'pieces' => 'product_feature',
-        'season' => 'product_feature',
         'images' => 'product_images',
         'primary' => 'product_variant_primary',
         'base_sku' => 'product_sku',
@@ -28,14 +26,17 @@ class FieldMapTransformer extends Transformer
         'collections' => 'product_collections',
     ];
 
-    public function transform(array $product): array
+    public function transform(array $data): array
     {
-        $product = collect($product['product'])
+        $variant = collect($data['variant'])
+            ->map(function ($value, $key) {
+                dd($value, $key);
+            })
             ->reduce(
                 fn($carry, $value, $key) => $this->transformKey(value: $value, key: $key, product: $carry), [],
             );
 
-        return collect($product)
+        return collect($variant)
             ->only(self::FIELD_MAP)
             ->toArray();
     }
@@ -64,7 +65,7 @@ class FieldMapTransformer extends Transformer
         $baseFieldValue = self::FIELD_MAP[$baseField] ?? false;
 
         $this->isSplitStringValue($value)
-            ? $product[$baseFieldMapped][$baseField] = array_map('trim', explode(',', $value))
+            ? $product[$baseFieldMapped][$baseField] = explode(',', $value)
             : ($this->isUniqueField($baseFieldValue)
                 ? ($product[$baseFieldMapped] = $value)
                 : ($product[$baseFieldMapped][$baseField] = $value)

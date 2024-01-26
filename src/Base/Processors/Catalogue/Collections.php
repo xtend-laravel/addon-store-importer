@@ -17,15 +17,11 @@ class Collections extends Processor
 {
     use InteractsWithProductModel;
 
-    public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
+    public function process(Collection $product, ?StoreImporterResourceModel $resourceModel = null): void
     {
         $this->setProductModel($product->get('productModel'));
 
-        $collections = collect($product->get('collections'))->map(
-            fn (array $collections, $group) => collect($collections)->filter()->map(
-                fn (string $collection) => $this->getCollection($collection, $group)
-            )
-        )->flatten();
+        $collections = $this->getCollections($product);
 
         if ($collections->isNotEmpty()) {
             $this->getProductModel()->collections()->sync($collections->pluck('id'));
@@ -38,8 +34,21 @@ class Collections extends Processor
         }
     }
 
-    protected function getCollection(string $collection, string $group): CollectionModel
+    protected function getCollections(Collection $product): Collection
     {
+        return collect($product->get('product_collections') ?? $product->get('collections'))->map(
+            fn (mixed $collections, $group) => collect(is_string($collections) ? [$collections] : $collections)->filter()->map(
+                fn (string $collection) => $this->ensureCollectionExists($collection, $group)
+            )
+        )->flatten();
+    }
+
+    protected function ensureCollectionExists(string $collection, string $group): CollectionModel
+    {
+        if ($group === 'style') {
+            $group = 'styles';
+        }
+
         $collectionGroup = CollectionGroup::firstOrCreate([
             'name' => Str::headline($group),
             'handle' => $group,

@@ -2,7 +2,6 @@
 
 namespace XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue;
 
-use FontLib\Table\Type\glyf;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -39,7 +38,7 @@ class ProductVariants extends Processor
     /**
      * @throws \Exception
      */
-    public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
+    public function process(Collection $product, ?StoreImporterResourceModel $resourceModel = null): void
     {
         $this->product = $product;
         $this->setProductModel($product->get('productModel'));
@@ -65,21 +64,21 @@ class ProductVariants extends Processor
 
     protected function updateOrCreateBaseVariant(): void
     {
-        $prices = $this->product->get('prices');
+        $prices = $this->product->get('product_prices') ?? $this->product->get('prices') ?? ['default' => 0];
 
         /** @var ProductVariant $variantModel */
         $variantModel = ProductVariant::query()->updateOrCreate([
-            'sku' => $this->product->get('sku'),
+            'sku' => $this->product->get('product_sku') ?? $this->product->get('sku'),
             'base' => true,
         ], [
-            'weight_value' => $this->product->get('weight') ?? 0,
-            'weight_unit' => 'lbs',
-            'stock' => $this->product->get('stock') ?? 0,
             'product_id' => $this->getProductModel()->id,
+            'weight_value' => $this->product->get('product_weight') ?? $this->product->get('weight') ?? 0,
             'tax_class_id' => $this->taxClass->id,
+            'weight_unit' => 'lbs',
+            'stock' => 0,
         ]);
 
-        Price::updateOrCreate([
+        $defaultPrice = Price::updateOrCreate([
             'priceable_type' => ProductVariant::class,
             'priceable_id' => $variantModel->id,
         ], [
@@ -88,6 +87,10 @@ class ProductVariants extends Processor
             'price' => $prices['default'],
             'tier' => 1,
         ]);
+
+        $productModel = $this->getProductModel();
+        $productModel->price_default_id = $defaultPrice->id;
+        $productModel->save();
     }
 
     /**
@@ -155,8 +158,8 @@ class ProductVariants extends Processor
 
         $stock = $this->getStock($optionsToCreate, $baseVariant);
 
-        $attributeData = array_merge($baseVariant->attribute_data ?? [], [
-            'availability' => new Text($stock > 0 ? 'in-stock' : 'pre-order'),
+        $attributeData = collect($baseVariant->attribute_data ?? [])->merge([
+            'availability' => new Text($stock > 9000 ? 'pre-order' : 'in-stock'),
         ]);
 
         $variant = ProductVariant::query()->updateOrCreate([

@@ -18,8 +18,9 @@ trait InteractWithTransformer
             pipes: [
                 Transformers\Product\FieldMapTransformer::class,
                 Transformers\Product\AttributeDataTransformer::class,
+                Transformers\Product\PriceTransformer::class,
                 Transformers\Product\FeaturesTransformer::class,
-                // Transformers\Product\ImagesTransformer::class,
+                Transformers\Product\ImagesTransformer::class,
             ],
         );
     }

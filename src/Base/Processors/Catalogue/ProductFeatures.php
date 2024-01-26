@@ -3,10 +3,8 @@
 namespace XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Lunar\FieldTypes\TranslatedText;
-use Xtend\Extensions\Lunar\Core\Models\ProductOption;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Catalogue\Concerns\InteractsWithProductModel;
 use XtendLunar\Addons\StoreImporter\Base\Processors\Processor;
 use XtendLunar\Addons\StoreImporter\Models\StoreImporterResourceModel;
@@ -18,11 +16,11 @@ class ProductFeatures extends Processor
 
     protected array $featureValueIds = [];
 
-    public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
+    public function process(Collection $product, ?StoreImporterResourceModel $resourceModel = null): void
     {
         $this->setProductModel($product->get('productModel'));
 
-        $features = collect($product->get('features'))->map(
+        $features = collect($product->get('product_feature') ?? $product->get('features') ?? [])->map(
             fn (array $feature, $handle) => $this->getFeature($feature, $handle)
         );
 
@@ -31,10 +29,10 @@ class ProductFeatures extends Processor
 
             $features->each(function (ProductFeature $feature) use ($product) {
                 $handle = $feature->handle;
-                $values = $product->get('features')[$handle]['values'] ?? [];
+                $values = $product->get('product_feature')[$handle]['values'] ?? [];
 
                 if ($values instanceof TranslatedText) {
-                    $name = $values->getValue()->get('en')->getValue();
+                    $name = $values->getValue()->get('en')?->getValue();
                 } else {
                     $name = $values['name'] ?? null;
                 }
@@ -44,15 +42,6 @@ class ProductFeatures extends Processor
                 ], ['name' => $values]);
 
                 $this->featureValueIds[] = $featureValue->id;
-
-                // $values->each(function (array $value) use ($feature) {
-                //     dd($value);
-                //     $featureValue = $feature->values()->updateOrCreate([
-                //         'name->en' => $value['name']->getValue()->get('en')->getValue(),
-                //     ], Arr::except($value, ['name']));
-                //
-                //     $this->featureValueIds[] = $featureValue->id;
-                // });
             });
 
             $this->getProductModel()->featureValues()->sync($this->featureValueIds);

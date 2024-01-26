@@ -35,6 +35,15 @@ trait InteractsWithProducts
         return $this;
     }
 
+    protected function primary(): self
+    {
+        $this->products = $this->products->filter(
+            fn($item) => $item['fields']['Primary'] ?? false,
+        );
+
+        return $this;
+    }
+
     protected function style(string $style): self
     {
         $this->products = $this->products->filter(
@@ -82,6 +91,7 @@ trait InteractsWithProducts
 
     protected function existsInStore(string $sku): bool
     {
-        return Product::query()->firstWhere('sku', $sku)->exists();
+        $product = Product::query()->firstWhere('sku', $sku);
+        return !!$product;
     }
 }

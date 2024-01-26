@@ -18,7 +18,7 @@ class ProductImages extends Processor
 
     protected Collection $images;
 
-    public function process(Collection $product, StoreImporterResourceModel $resourceModel): void
+    public function process(Collection $product, ?StoreImporterResourceModel $resourceModel = null): void
     {
         $this->images = collect();
         $this->setProductModel($product->get('productModel'));

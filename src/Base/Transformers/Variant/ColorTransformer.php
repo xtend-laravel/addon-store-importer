@@ -19,15 +19,21 @@ class ColorTransformer extends Transformer
             throw new \Exception('No primary color found for product variant .'.$productVariant['product_sku']);
         }
 
+        if (!is_array($productOptions['color'])) {
+            $productOptions['color'] = [$productOptions['color']];
+        }
+
         $productVariant['color'] = [
-            'name' => new TranslatedText(
-                collect($productOptions['primary_color'])
-                    ->map(fn($value, $key) => new Text($value)),
-                ),
-            'color' => $productOptions['color'][0] ?? null,
-            'primary_color' => $productOptions['color'][0] ?? null,
-            'secondary_color' => $productOptions['color'][1] ?? null,
-            'tertiary_color' => $productOptions['color'][2] ?? null,
+            [
+                'name' => new TranslatedText(
+                    collect($productOptions['primary_color'])
+                        ->map(fn($value, $key) => new Text($value)),
+                    ),
+                'color' => $productOptions['color'][0] ?? null,
+                'primary_color' => $productOptions['color'][0] ?? null,
+                'secondary_color' => $productOptions['color'][1] ?? null,
+                'tertiary_color' => $productOptions['color'][2] ?? null,
+            ],
         ];
 
         return $productVariant;
