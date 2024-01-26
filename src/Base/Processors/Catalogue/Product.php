@@ -18,7 +18,7 @@ class Product extends Processor
     {
         /** @var ProductModel $productModel */
         $productModel = ProductModel::updateOrCreate([
-            'sku' => $product->get('product_sku') ?? $product->get('sku'),
+            'sku' => strtolower($product->get('product_sku')) ?? strtolower($product->get('sku')),
         ], [
             'attribute_data' => $product->get('attribute_data'),
             'product_type_id' => $this->getDefaultProductTypeId(),
@@ -33,7 +33,7 @@ class Product extends Processor
             $productModel->urls()->create([
                 'default' => $languageId === Language::getDefault()->id,
                 'language_id' => $languageId,
-                'slug' => strtolower($this->slug($value).'-'.$product->get('product_sku') ?? $product->get('sku')),
+                'slug' => $this->slug($value).'-'.strtolower($product->get('product_sku')) ?? strtolower($product->get('sku')),
             ]);
         });
 
