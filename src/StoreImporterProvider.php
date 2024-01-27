@@ -67,10 +67,9 @@ class StoreImporterProvider extends XtendAddonProvider
             ]);
         }
 
-        if ($this->app->environment('production')) {
+        if ($this->app->environment(['production', 'staging'])) {
             $this->app->afterResolving(Schedule::class, function (Schedule $schedule) {
-                // $schedule->command(SyncProducts::class)->dailyAt('00:00');
-                // $schedule->command(DeleteProductsNotInChannel::class)->dailyAt('00:00');
+                $schedule->command(InventoryUpdateSync::class)->everyThirtyMinutes();
             });
         }
 

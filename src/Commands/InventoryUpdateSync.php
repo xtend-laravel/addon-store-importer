@@ -51,9 +51,11 @@ class InventoryUpdateSync extends AirtableBaseCommand
             });
 
         $productsMap->each(
-            fn ($product, $sku) => $this->existsInStore($sku)
-                ? $this->updateProduct($sku, $product)
-                : $this->createProduct($sku, $product),
+            function ($product, $sku) {
+                $this->existsInStore($sku)
+                    ? $this->updateProduct($sku, $product)
+                    : $this->createProduct($sku, $product);
+            },
         );
 
         return self::SUCCESS;
