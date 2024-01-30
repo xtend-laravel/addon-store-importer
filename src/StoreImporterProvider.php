@@ -69,7 +69,7 @@ class StoreImporterProvider extends XtendAddonProvider
 
         if ($this->app->environment(['production', 'staging'])) {
             $this->app->afterResolving(Schedule::class, function (Schedule $schedule) {
-                $schedule->command(InventoryUpdateSync::class)->everyThirtyMinutes();
+                // $schedule->command(InventoryUpdateSync::class)->everyThirtyMinutes();
             });
         }
 
