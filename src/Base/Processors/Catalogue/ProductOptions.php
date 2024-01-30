@@ -71,7 +71,7 @@ class ProductOptions extends Processor
 
             $optionValue = $option->values()->updateOrCreate([
                 'name->en' => $name,
-            ], Arr::except($value, ['stock']));
+            ], Arr::except($value, ['stock', 'primary_variant']));
 
             $this->optionValues->push($optionValue);
         });

@@ -43,7 +43,7 @@ class InventoryUpdateSync extends AirtableBaseCommand
                 $product['variants'] = $this->productVariants($product)
                     ->transform(
                         fn($productVariant) => collect($this->transformVariant($productVariant))
-                            ->only(['color', 'size', 'images'])
+                            ->only(['color', 'size', 'images', 'variant_primary'])
                             ->toArray(),
                     );
                 $product['product_images'] = $product['variants']->pluck('images')->toArray();

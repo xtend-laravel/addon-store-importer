@@ -33,8 +33,10 @@ class ColorTransformer extends Transformer
                 'primary_color' => $productOptions['color'][0] ?? null,
                 'secondary_color' => $productOptions['color'][1] ?? null,
                 'tertiary_color' => $productOptions['color'][2] ?? null,
+                'primary_variant' => $productVariant['product_variant_primary'] ?? false,
             ],
         ];
+
 
         return $productVariant;
     }

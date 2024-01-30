@@ -47,7 +47,7 @@ class ProductImages extends Processor
             )?->translate('name');
 
             $matchedOption = collect($product->get('options'))
-                ->first(function ($option) use ($colorOption) {
+                ->first(function ($option) use ($colorOption, $variant) {
                     $color = collect($option['color'])->first();
                     $colorValue = $color['name']->getValue()->get('en')->getValue();
                     return $colorValue === $colorOption;
@@ -56,6 +56,10 @@ class ProductImages extends Processor
             if (! $colorOption || ! $matchedOption) {
                 return;
             }
+
+            $variant->update([
+                'primary' => collect($matchedOption['color'])->first()['primary_variant'] ?? false,
+            ]);
 
             $imageIds = $this->images
                 ->filter(fn ($fileKey, $imageId) => collect($matchedOption['images'])->keys()->contains($fileKey))
